@@ -25,6 +25,19 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "apiBaseUrl": "http://10.206.169.135:8000",
+      "wsUrl": "ws://10.206.169.135:8000/ws",
+      "firebaseApiKey": "AIzaSyAdm-8XF20AGxGLk6Ej_k-GSRla4B3XclQ",
+      "firebaseAuthDomain": "privora-61d4d.firebaseapp.com",
+      "firebaseProjectId": "privora-61d4d",
+      "firebaseStorageBucket": "privora-61d4d.firebasestorage.app",
+      "firebaseMessagingSenderId": "118761355969",
+      "firebaseAppId": "1:118761355969:web:210c4c457d7a0ed73e3240"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }
