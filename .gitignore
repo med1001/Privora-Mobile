@@ -34,6 +34,7 @@ yarn-error.*
 .env*.local
 .env
 .env.*
+!.env.example
 
 # app secrets/config snapshots
 firebase-credentials*.json

@@ -3,7 +3,6 @@ import Constants from "expo-constants";
 type ExtraConfig = {
   apiBaseUrl?: string;
   wsUrl?: string;
-  firebaseApiKey?: string;
   firebaseAuthDomain?: string;
   firebaseProjectId?: string;
   firebaseStorageBucket?: string;
@@ -17,8 +16,8 @@ export const config = {
   apiBaseUrl: extra.apiBaseUrl ?? "http://10.0.2.2:8080",
   wsUrl: extra.wsUrl ?? "ws://10.0.2.2:8080/ws",
   firebase: {
-    // Keep API key out of app.json to avoid committing it by mistake.
-    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? extra.firebaseApiKey ?? "",
+    // Force env-based key to prevent reintroducing it in tracked config.
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? "",
     authDomain: extra.firebaseAuthDomain ?? "",
     projectId: extra.firebaseProjectId ?? "",
     storageBucket: extra.firebaseStorageBucket ?? "",
