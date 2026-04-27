@@ -14,11 +14,20 @@ npm install
 
 ## 2) Configure app credentials
 
+Copy environment template:
+
+```bash
+cp .env.example .env
+```
+
+Set in `.env`:
+
+- `EXPO_PUBLIC_FIREBASE_API_KEY`
+
 Edit `app.json` under `expo.extra`:
 
 - `apiBaseUrl`
 - `wsUrl`
-- `firebaseApiKey`
 - `firebaseAuthDomain`
 - `firebaseProjectId`
 - `firebaseStorageBucket`

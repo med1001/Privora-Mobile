@@ -17,7 +17,8 @@ export const config = {
   apiBaseUrl: extra.apiBaseUrl ?? "http://10.0.2.2:8080",
   wsUrl: extra.wsUrl ?? "ws://10.0.2.2:8080/ws",
   firebase: {
-    apiKey: extra.firebaseApiKey ?? "",
+    // Keep API key out of app.json to avoid committing it by mistake.
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? extra.firebaseApiKey ?? "",
     authDomain: extra.firebaseAuthDomain ?? "",
     projectId: extra.firebaseProjectId ?? "",
     storageBucket: extra.firebaseStorageBucket ?? "",
@@ -30,7 +31,7 @@ export function assertFirebaseConfigured() {
   const required = Object.entries(config.firebase).filter(([, value]) => !value);
   if (required.length > 0) {
     throw new Error(
-      `Firebase config missing fields: ${required.map(([key]) => key).join(", ")}. Add them in app.json > expo.extra.`,
+      `Firebase config missing fields: ${required.map(([key]) => key).join(", ")}. Set EXPO_PUBLIC_FIREBASE_API_KEY in .env and remaining fields in app.json > expo.extra.`,
     );
   }
 }

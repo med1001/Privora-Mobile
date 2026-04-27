@@ -13,15 +13,25 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Privora uses the microphone for voice calls with your contacts."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.PrivoraMobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -29,7 +39,6 @@
     "extra": {
       "apiBaseUrl": "http://10.206.169.135:8000",
       "wsUrl": "ws://10.206.169.135:8000/ws",
-      "firebaseApiKey": "AIzaSyAdm-8XF20AGxGLk6Ej_k-GSRla4B3XclQ",
       "firebaseAuthDomain": "privora-61d4d.firebaseapp.com",
       "firebaseProjectId": "privora-61d4d",
       "firebaseStorageBucket": "privora-61d4d.firebasestorage.app",
