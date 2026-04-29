@@ -37,8 +37,8 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiBaseUrl": "http://10.206.169.135:8000",
-      "wsUrl": "ws://10.206.169.135:8000/ws",
+      "apiBaseUrl": "http://10.0.2.2:8000",
+      "wsUrl": "ws://10.0.2.2:8000/ws",
       "firebaseAuthDomain": "privora-61d4d.firebaseapp.com",
       "firebaseProjectId": "privora-61d4d",
       "firebaseStorageBucket": "privora-61d4d.firebasestorage.app",
