@@ -43,6 +43,7 @@ export type WsIncomingMessage =
 export type ChatMessage = {
   id: string;
   senderId: string;
+  recipientId?: string;
   senderName: string;
   text: string;
   timestamp: string;

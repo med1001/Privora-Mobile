@@ -64,6 +64,12 @@ export function ChatListScreen({ session }: Props) {
     return value;
   };
 
+  const isLocalMessage = (senderId: string) => {
+    const normalizedSender = senderId.trim().toLowerCase();
+    return normalizedSender === (user?.email || "").trim().toLowerCase()
+      || normalizedSender === (user?.uid || "").trim().toLowerCase();
+  };
+
   const runSearch = async (searchValue: string) => {
     const clean = searchValue.trim();
     if (!clean) {
@@ -200,6 +206,7 @@ export function ChatListScreen({ session }: Props) {
         ListEmptyComponent={<Text style={styles.emptySide}>No chats yet.</Text>}
         renderItem={({ item }) => {
           const selected = item.userId === session.selectedChatUserId;
+          const unreadCount = session.unreadByUser[item.userId] ?? 0;
           const nameForInitial = (item.displayName || item.userId).trim();
           const itemInitial = nameForInitial.charAt(0).toUpperCase();
           return (
@@ -214,6 +221,11 @@ export function ChatListScreen({ session }: Props) {
                     : toDisplayName(item.displayName, item.userId)}
                 </Text>
               </View>
+              {unreadCount > 0 ? (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
+                </View>
+              ) : null}
             </Pressable>
           );
         }}
@@ -312,7 +324,7 @@ export function ChatListScreen({ session }: Props) {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             renderItem={({ item }) => {
-              const mine = item.senderId !== selectedContact.userId;
+              const mine = isLocalMessage(item.senderId);
               return (
                 <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubblePeer]}>
                   <Text style={[styles.messageText, mine && { color: "#fff" }]}>{item.text}</Text>
@@ -622,6 +634,20 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 12,
+  },
+  unreadBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    backgroundColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unreadBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
   },
   error: {
     color: "#fecaca",
