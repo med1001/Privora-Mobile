@@ -58,6 +58,7 @@ export class WsClient {
       this.openedAt = Date.now();
       this.abnormalCloseCount = 0;
       this.send({ type: "login", token: this.token });
+      this.send({ type: "signal_session_claim" });
       this.startPing();
     };
 

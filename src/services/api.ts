@@ -5,6 +5,11 @@ type SearchUserResponse = {
   displayName: string;
 };
 
+export type RtcConfigResponse = {
+  iceServers?: Array<{ urls?: string | string[]; username?: string; credential?: string; url?: string }>;
+  iceTransportPolicy?: "all" | "relay";
+};
+
 async function apiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${config.apiBaseUrl}${path}`, {
     ...init,
@@ -26,6 +31,12 @@ async function apiFetch<T>(path: string, token: string, init?: RequestInit): Pro
 export function searchUsers(query: string, token: string) {
   const encoded = encodeURIComponent(query.trim());
   return apiFetch<SearchUserResponse[]>(`/search-users?q=${encoded}`, token, {
+    method: "GET",
+  });
+}
+
+export function fetchRtcConfig(token: string) {
+  return apiFetch<RtcConfigResponse>("/api/rtc-config", token, {
     method: "GET",
   });
 }
