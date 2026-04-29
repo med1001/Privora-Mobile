@@ -19,14 +19,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { RootStackParamList } from "../navigation/RootNavigator";
 import { useChatSession } from "../hooks/useChatSession";
+import type { CallState } from "../hooks/useWebRTCCall";
 import { searchUsers } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
-type Props = NativeStackScreenProps<RootStackParamList, "ChatList"> & {
-  session: ReturnType<typeof useChatSession>;
+type CallControls = {
+  callState: CallState;
+  isMuted: boolean;
+  toggleMute: () => void;
+  initiateCall: (peerId: string, peerName: string) => void;
+  acceptCall: () => void;
+  rejectCall: () => void;
+  endCall: () => void;
 };
 
-export function ChatListScreen({ session }: Props) {
+type Props = NativeStackScreenProps<RootStackParamList, "ChatList"> & {
+  session: ReturnType<typeof useChatSession>;
+  call?: CallControls;
+};
+
+export function ChatListScreen({ session, call }: Props) {
   const { getIdToken, logout, user } = useAuth();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -38,6 +50,7 @@ export function ChatListScreen({ session }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [revealedSystemMessageId, setRevealedSystemMessageId] = useState<string | null>(null);
   const drawerTranslateX = useRef(new Animated.Value(-340)).current;
 
   const isDesktopLike = width >= 900;
@@ -68,6 +81,39 @@ export function ChatListScreen({ session }: Props) {
     const normalizedSender = senderId.trim().toLowerCase();
     return normalizedSender === (user?.email || "").trim().toLowerCase()
       || normalizedSender === (user?.uid || "").trim().toLowerCase();
+  };
+
+  const formatSystemMessage = (text: string, mine: boolean) => {
+    if (!text.startsWith("__system_call:")) return null;
+
+    const parts = text.split(":");
+    if (parts[1] === "missed") {
+      return mine ? "Call unanswered \u260E" : "Missed call \u260E";
+    }
+    if (parts[1] === "ended") {
+      const minutes = parts[2] || "00";
+      const seconds = parts[3] || "00";
+      return `Call ended \u260E Duration: ${minutes}:${seconds}`;
+    }
+
+    return "Call information";
+  };
+
+  const formatTimestamp = (timestamp: string | null | undefined) => {
+    if (!timestamp) return "";
+    try {
+      const safe = timestamp.endsWith("Z") || timestamp.includes("+") ? timestamp : `${timestamp}Z`;
+      const date = new Date(safe);
+      if (Number.isNaN(date.getTime())) return "";
+      return date.toLocaleString([], {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "";
+    }
   };
 
   const runSearch = async (searchValue: string) => {
@@ -262,7 +308,15 @@ export function ChatListScreen({ session }: Props) {
           </View>
           {!!selectedContact && selectedContact.userId !== localUserId && (
             <View style={styles.callWrap}>
-              <Pressable style={styles.callBtn} accessibilityLabel="Start call">
+              <Pressable
+                style={[styles.callBtn, !call && styles.callBtnDisabled]}
+                accessibilityLabel="Start call"
+                disabled={!call}
+                onPress={() => {
+                  if (!call || !selectedContact) return;
+                  call.initiateCall(selectedContact.userId, toDisplayName(selectedContact.displayName, selectedContact.userId));
+                }}
+              >
                 <Ionicons name="call" size={16} color="#fff" />
               </Pressable>
               <View style={styles.callPresenceRow}>
@@ -325,6 +379,26 @@ export function ChatListScreen({ session }: Props) {
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             renderItem={({ item }) => {
               const mine = isLocalMessage(item.senderId);
+              const systemMessage = formatSystemMessage(item.text, mine);
+              if (systemMessage) {
+                const revealed = revealedSystemMessageId === item.id;
+                const timeLabel = formatTimestamp(item.timestamp);
+                return (
+                  <Pressable
+                    style={styles.systemMessageOuter}
+                    onPress={() => setRevealedSystemMessageId(revealed ? null : item.id)}
+                    accessibilityLabel="Show call details"
+                  >
+                    <View style={styles.systemMessageWrap}>
+                      <Text style={styles.systemMessageText}>{systemMessage}</Text>
+                    </View>
+                    {revealed && timeLabel ? (
+                      <Text style={styles.systemMessageTimestamp}>{timeLabel}</Text>
+                    ) : null}
+                  </Pressable>
+                );
+              }
+
               return (
                 <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubblePeer]}>
                   <Text style={[styles.messageText, mine && { color: "#fff" }]}>{item.text}</Text>
@@ -453,6 +527,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  callBtnDisabled: {
+    backgroundColor: "#64748b",
+  },
   callPresenceRow: {
     marginTop: 3,
     flexDirection: "row",
@@ -502,6 +579,30 @@ const styles = StyleSheet.create({
   messageText: {
     color: "#111827",
     fontSize: 15,
+  },
+  systemMessageOuter: {
+    alignItems: "center",
+    width: "100%",
+    marginVertical: 6,
+  },
+  systemMessageWrap: {
+    alignSelf: "center",
+    backgroundColor: "#f3f4f6",
+    borderColor: "#e5e7eb",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  systemMessageText: {
+    color: "#6b7280",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  systemMessageTimestamp: {
+    color: "#9ca3af",
+    fontSize: 10,
+    marginTop: 4,
   },
   inputRow: {
     borderTopWidth: 1,
