@@ -1,10 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { WsClient } from "../services/wsClient";
-import { ChatContact, ChatMessage } from "../types/chat";
+import { ChatContact, ChatMessage, WsIncomingMessage } from "../types/chat";
 
 type MessagesByUser = Record<string, ChatMessage[]>;
 type UnreadByUser = Record<string, number>;
+type UseChatSessionOptions = {
+  onWebRtcSignal?: (payload: WsIncomingMessage) => void;
+};
+
+const CALL_SIGNAL_TYPES = new Set([
+  "call_offer",
+  "call_answer",
+  "ice_candidate",
+  "call_reject",
+  "call_end",
+  "call_ring",
+  "call_ring_offline",
+  "call_accepting",
+  "call_connected",
+]);
 
 function safeIso(value?: string) {
   if (!value) return new Date().toISOString();
@@ -46,10 +61,11 @@ function isLocalId(value: string | null | undefined, localIds: Set<string>) {
   return !!value && localIds.has(normalizeId(value));
 }
 
-export function useChatSession() {
+export function useChatSession(options?: UseChatSessionOptions) {
   const { getIdToken, logout, user } = useAuth();
   const wsRef = useRef<WsClient | null>(null);
   const selectedChatUserIdRef = useRef<string | null>(null);
+  const webRtcSignalRef = useRef<((payload: WsIncomingMessage) => void) | undefined>(options?.onWebRtcSignal);
 
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [messagesByUser, setMessagesByUser] = useState<MessagesByUser>({});
@@ -61,6 +77,10 @@ export function useChatSession() {
   useEffect(() => {
     selectedChatUserIdRef.current = selectedChatUserId;
   }, [selectedChatUserId]);
+
+  useEffect(() => {
+    webRtcSignalRef.current = options?.onWebRtcSignal;
+  }, [options?.onWebRtcSignal]);
 
   useEffect(() => {
     if (!user) {
@@ -84,6 +104,11 @@ export function useChatSession() {
       if (!active) return;
 
       const localIds = buildLocalIdSet(user);
+
+      if (CALL_SIGNAL_TYPES.has(payload.type)) {
+        webRtcSignalRef.current?.(payload);
+        return;
+      }
 
       if ((payload.type === "message" || payload.type === "offline") && payload.from && payload.message) {
         const payloadTo = (payload as { to?: string }).to;
@@ -294,6 +319,41 @@ export function useChatSession() {
     });
   };
 
+  const sendSignaling = (payload: Record<string, unknown>) => {
+    return wsRef.current?.send(payload) ?? false;
+  };
+
+  const sendCallSummaryMessage = (peerId: string, text: string) => {
+    if (!peerId || !user) return false;
+
+    const id = `${user.uid}-call-${Date.now()}`;
+    const senderId = user.email || user.uid;
+    const senderName = user.displayName || senderId;
+    const timestamp = new Date().toISOString();
+
+    setMessagesByUser((prev) => {
+      const next = { ...prev };
+      const existing = next[peerId] ?? [];
+      next[peerId] = upsertMessage(existing, {
+        id,
+        senderId,
+        recipientId: peerId,
+        senderName,
+        text,
+        timestamp,
+      });
+      return next;
+    });
+
+    return wsRef.current?.send({
+      type: "message",
+      msg_id: id,
+      to: peerId,
+      message: text,
+      fromDisplayName: senderName,
+    }) ?? false;
+  };
+
   const upsertContacts = (entries: ChatContact[]) => {
     setContacts((prev) => {
       const map = new Map(prev.map((item) => [item.userId, item]));
@@ -316,6 +376,8 @@ export function useChatSession() {
     selectedMessages,
     setSelectedChatUserId: selectChatUserId,
     sendMessage,
+    sendSignaling,
+    sendCallSummaryMessage,
     upsertContacts,
     wsReady,
     lastError,
