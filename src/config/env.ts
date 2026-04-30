@@ -13,8 +13,8 @@ type ExtraConfig = {
 const extra = (Constants.expoConfig?.extra ?? {}) as ExtraConfig;
 
 export const config = {
-  apiBaseUrl: extra.apiBaseUrl ?? "http://10.0.2.2:8080",
-  wsUrl: extra.wsUrl ?? "ws://10.0.2.2:8080/ws",
+  apiBaseUrl: extra.apiBaseUrl ?? "http://10.0.2.2:8000",
+  wsUrl: extra.wsUrl ?? "ws://10.0.2.2:8000/ws",
   firebase: {
     // Force env-based key to prevent reintroducing it in tracked config.
     apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? "",
