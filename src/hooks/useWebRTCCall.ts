@@ -42,6 +42,8 @@ type RTCConfigPayload = {
 type IceCandidateInit = { candidate?: string; sdpMLineIndex?: number | null; sdpMid?: string | null };
 type SessionDescriptionInit = { sdp: string; type: "offer" | "answer" };
 
+// react-native-webrtc's MediaTrackConstraints type omits common audio
+// processing flags, so we cast through unknown to opt-in to them at runtime.
 const AUDIO_CONSTRAINTS = {
   audio: {
     echoCancellation: true,
@@ -49,7 +51,7 @@ const AUDIO_CONSTRAINTS = {
     autoGainControl: true,
   },
   video: false,
-};
+} as unknown as { audio: boolean; video: boolean };
 
 const DEFAULT_ICE_SERVERS: RTCConfigPayload["iceServers"] = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
