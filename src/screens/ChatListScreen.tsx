@@ -22,6 +22,10 @@ import { useChatSession } from "../hooks/useChatSession";
 import type { CallState } from "../hooks/useWebRTCCall";
 import { searchUsers } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { MessageBubble } from "../components/MessageBubble";
+import { AttachmentMenu } from "../components/AttachmentMenu";
+import { VoiceRecorder } from "../components/VoiceRecorder";
+import { ImagePreviewModal } from "../components/ImagePreviewModal";
 
 type CallControls = {
   callState: CallState;
@@ -50,8 +54,10 @@ export function ChatListScreen({ session, call }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [revealedSystemMessageId, setRevealedSystemMessageId] = useState<string | null>(null);
+  const [revealedMessageId, setRevealedMessageId] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const drawerTranslateX = useRef(new Animated.Value(-340)).current;
+  const messageListRef = useRef<FlatList>(null);
 
   const isDesktopLike = width >= 900;
   const contacts = useMemo(() => session.contacts, [session.contacts]);
@@ -173,6 +179,16 @@ export function ChatListScreen({ session, call }: Props) {
     });
   }, [drawerOpen, isDesktopLike, drawerTranslateX]);
 
+  // Auto-scroll to the most recent message when the list grows or the active
+  // chat changes.
+  useEffect(() => {
+    if (!messages.length) return;
+    const id = setTimeout(() => {
+      messageListRef.current?.scrollToEnd({ animated: true });
+    }, 60);
+    return () => clearTimeout(id);
+  }, [messages.length, session.selectedChatUserId]);
+
   const onSelectContact = (userId: string, displayName?: string) => {
     if (!contacts.some((item) => item.userId === userId)) {
       session.upsertContacts([
@@ -191,6 +207,33 @@ export function ChatListScreen({ session, call }: Props) {
     if (!draft.trim()) return;
     const ok = session.sendMessage(draft);
     if (ok) setDraft("");
+  };
+
+  const handleReaction = (messageId: string, emoji: string) => {
+    if (!selectedContact) return;
+    session.sendReaction(messageId, selectedContact.userId, emoji);
+  };
+
+  const handleAttachmentUploaded = ({
+    url,
+    filename,
+    mimeType,
+  }: {
+    url: string;
+    filename?: string;
+    mimeType?: string;
+  }) => {
+    if (!selectedContact) return;
+    const isImage = (mimeType || "").startsWith("image/");
+    const text = isImage
+      ? `__system_image:${url}`
+      : `__system_file:${url}|${filename || "Attachment"}`;
+    session.sendRawMessage(text, selectedContact.userId);
+  };
+
+  const handleVoiceRecorded = (dataUrl: string) => {
+    if (!selectedContact) return;
+    session.sendRawMessage(`__system_audio:${dataUrl}`, selectedContact.userId);
   };
 
   const renderSidebar = (mobile: boolean) => (
@@ -255,13 +298,24 @@ export function ChatListScreen({ session, call }: Props) {
           const unreadCount = session.unreadByUser[item.userId] ?? 0;
           const nameForInitial = (item.displayName || item.userId).trim();
           const itemInitial = nameForInitial.charAt(0).toUpperCase();
+          const showOnlineDot = item.userId !== localUserId;
           return (
             <Pressable style={[styles.contactItem, selected && styles.contactItemSelected]} onPress={() => onSelectContact(item.userId)}>
-              <View style={styles.contactAvatar}>
-                <Text style={styles.contactAvatarText}>{itemInitial}</Text>
+              <View style={styles.contactAvatarWrap}>
+                <View style={styles.contactAvatar}>
+                  <Text style={styles.contactAvatarText}>{itemInitial}</Text>
+                </View>
+                {showOnlineDot && (
+                  <View
+                    style={[
+                      styles.contactPresenceDot,
+                      { backgroundColor: item.online ? "#4ade80" : "#94a3b8" },
+                    ]}
+                  />
+                )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.contactName}>
+                <Text style={styles.contactName} numberOfLines={1}>
                   {item.userId === localUserId
                     ? `${toDisplayName(item.displayName, item.userId)} (me)`
                     : toDisplayName(item.displayName, item.userId)}
@@ -300,11 +354,17 @@ export function ChatListScreen({ session, call }: Props) {
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
               {selectedContact
                 ? toDisplayName(selectedContact.displayName, selectedContact.userId)
                 : "No user selected"}
             </Text>
+            {!session.wsReady && (
+              <View style={styles.wsStatusRow}>
+                <Ionicons name="cloud-offline" size={11} color="#fde68a" />
+                <Text style={styles.wsStatusText}>Reconnecting…</Text>
+              </View>
+            )}
           </View>
           {!!selectedContact && selectedContact.userId !== localUserId && (
             <View style={styles.callWrap}>
@@ -368,25 +428,28 @@ export function ChatListScreen({ session, call }: Props) {
 
         {!selectedContact ? (
           <View style={styles.emptyChatWrap}>
+            <Ionicons name="chatbubble-ellipses-outline" size={48} color="#cbd5e1" />
             <Text style={styles.emptyChatTitle}>Select a user to start chatting</Text>
           </View>
         ) : (
           <FlatList
+            ref={messageListRef}
             data={messages}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messageList}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            onContentSizeChange={() => messageListRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item }) => {
               const mine = isLocalMessage(item.senderId);
               const systemMessage = formatSystemMessage(item.text, mine);
               if (systemMessage) {
-                const revealed = revealedSystemMessageId === item.id;
+                const revealed = revealedMessageId === item.id;
                 const timeLabel = formatTimestamp(item.timestamp);
                 return (
                   <Pressable
                     style={styles.systemMessageOuter}
-                    onPress={() => setRevealedSystemMessageId(revealed ? null : item.id)}
+                    onPress={() => setRevealedMessageId(revealed ? null : item.id)}
                     accessibilityLabel="Show call details"
                   >
                     <View style={styles.systemMessageWrap}>
@@ -400,9 +463,21 @@ export function ChatListScreen({ session, call }: Props) {
               }
 
               return (
-                <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubblePeer]}>
-                  <Text style={[styles.messageText, mine && { color: "#fff" }]}>{item.text}</Text>
-                </View>
+                <MessageBubble
+                  message={item}
+                  mine={mine}
+                  revealed={revealedMessageId === item.id}
+                  onToggleReveal={() =>
+                    setRevealedMessageId((current) => (current === item.id ? null : item.id))
+                  }
+                  onReact={(emoji) => handleReaction(item.id, emoji)}
+                  onPreviewImage={(url) => setPreviewUrl(url)}
+                  onRetry={
+                    item.status === "failed" && selectedContact
+                      ? () => session.retryMessage(item.id, selectedContact.userId)
+                      : undefined
+                  }
+                />
               );
             }}
           />
@@ -410,18 +485,15 @@ export function ChatListScreen({ session, call }: Props) {
 
         <View style={[styles.inputRow, { paddingBottom: 10 + Math.max(insets.bottom, 6) }]}>
           <View style={styles.leftActions}>
-            <Pressable style={styles.actionIconBtn} accessibilityLabel="Camera">
-              <Ionicons name="camera-outline" size={20} color="#6b7280" />
-            </Pressable>
-            <Pressable style={styles.actionIconBtn} accessibilityLabel="Images">
-              <Ionicons name="image-outline" size={20} color="#6b7280" />
-            </Pressable>
-            <Pressable style={styles.actionIconBtn} accessibilityLabel="Attachment">
-              <Ionicons name="attach-outline" size={20} color="#6b7280" />
-            </Pressable>
-            <Pressable style={styles.actionIconBtn} accessibilityLabel="Voice message">
-              <Ionicons name="mic-outline" size={20} color="#6b7280" />
-            </Pressable>
+            <AttachmentMenu
+              getToken={getIdToken}
+              disabled={!selectedContact || selectedContact.userId === localUserId}
+              onUploaded={handleAttachmentUploaded}
+            />
+            <VoiceRecorder
+              disabled={!selectedContact || selectedContact.userId === localUserId}
+              onRecorded={handleVoiceRecorded}
+            />
           </View>
           <TextInput
             value={draft}
@@ -433,12 +505,12 @@ export function ChatListScreen({ session, call }: Props) {
             editable={!!selectedContact}
           />
           <Pressable
-            style={[styles.sendBtn, !selectedContact && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, (!selectedContact || !draft.trim()) && styles.sendBtnDisabled]}
             onPress={onSendMessage}
-            disabled={!selectedContact}
+            disabled={!selectedContact || !draft.trim()}
             accessibilityLabel="Send message"
           >
-            <Ionicons name="paper-plane-outline" size={18} color="#fff" />
+            <Ionicons name="paper-plane" size={18} color="#fff" />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -455,6 +527,8 @@ export function ChatListScreen({ session, call }: Props) {
           </View>
         </Modal>
       )}
+
+      <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </SafeAreaView>
   );
 }
@@ -500,20 +574,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 20,
   },
-  headerStatusRow: {
+  wsStatusRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     marginTop: 2,
   },
-  headerStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 99,
-  },
-  headerSub: {
-    color: "#bfdbfe",
-    fontSize: 13,
+  wsStatusText: {
+    color: "#fde68a",
+    fontSize: 11,
+    fontWeight: "600",
   },
   callWrap: {
     alignItems: "center",
@@ -551,6 +621,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
+    gap: 12,
   },
   emptyChatTitle: {
     color: "#64748b",
@@ -559,26 +630,7 @@ const styles = StyleSheet.create({
   },
   messageList: {
     padding: 12,
-    gap: 8,
     flexGrow: 1,
-  },
-  bubble: {
-    maxWidth: "80%",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  bubbleMine: {
-    marginLeft: "auto",
-    backgroundColor: "#2563eb",
-  },
-  bubblePeer: {
-    marginRight: "auto",
-    backgroundColor: "#f3f4f6",
-  },
-  messageText: {
-    color: "#111827",
-    fontSize: 15,
   },
   systemMessageOuter: {
     alignItems: "center",
@@ -618,13 +670,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 2,
   },
-  actionIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   messageInput: {
     flex: 1,
     borderWidth: 1,
@@ -641,7 +686,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: 44,
     height: 44,
-    backgroundColor: "#93c5fd",
+    backgroundColor: "#2563eb",
   },
   sendBtnDisabled: {
     backgroundColor: "#93c5fd",
@@ -723,6 +768,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontSize: 15,
   },
+  contactAvatarWrap: {
+    position: "relative",
+  },
   contactAvatar: {
     width: 30,
     height: 30,
@@ -735,6 +783,16 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 12,
+  },
+  contactPresenceDot: {
+    position: "absolute",
+    right: -1,
+    bottom: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 99,
+    borderWidth: 2,
+    borderColor: "#1e3a8a",
   },
   unreadBadge: {
     minWidth: 24,
