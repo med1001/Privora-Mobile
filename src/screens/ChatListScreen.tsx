@@ -237,7 +237,16 @@ export function ChatListScreen({ session, call }: Props) {
   };
 
   const renderSidebar = (mobile: boolean) => (
-    <View style={[styles.sidebar, mobile ? styles.sidebarMobile : styles.sidebarDesktop]}>
+    <View
+      style={[
+        styles.sidebar,
+        mobile ? styles.sidebarMobile : styles.sidebarDesktop,
+        mobile && {
+          paddingTop: Math.max(insets.top, 0) + 12,
+          paddingBottom: Math.max(insets.bottom, 0) + 12,
+        },
+      ]}
+    >
       <View style={styles.sidebarHeader}>
         <Text style={styles.sidebarTitle}>Privora</Text>
         {mobile && (
