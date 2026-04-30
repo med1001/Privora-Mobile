@@ -200,13 +200,7 @@ export function MessageBubble({
   const hasReactions = reactionEntries.length > 0;
 
   return (
-    <View
-      style={[
-        styles.outer,
-        mine ? styles.outerMine : styles.outerPeer,
-        hasReactions && styles.outerWithReactions,
-      ]}
-    >
+    <View style={[styles.outer, mine ? styles.outerMine : styles.outerPeer]}>
       <Pressable
         style={[
           styles.bubble,
@@ -224,6 +218,7 @@ export function MessageBubble({
           <ReactionPicker
             align={mine ? "end" : "start"}
             position={pickerBelow ? "below" : "above"}
+            absolute={!pickerBelow}
             onPick={(emoji) => {
               setPickerOpen(false);
               onReact(emoji);
@@ -267,18 +262,14 @@ export function MessageBubble({
 const styles = StyleSheet.create({
   outer: {
     maxWidth: "80%",
-    marginVertical: 4,
+    marginTop: 4,
+    marginBottom: 18,
   },
   outerMine: {
     alignSelf: "flex-end",
   },
   outerPeer: {
     alignSelf: "flex-start",
-  },
-  // Reserve room under the bubble when a reaction pill is overlapping its
-  // bottom edge, so the next message doesn't get visually glued to it.
-  outerWithReactions: {
-    marginBottom: 18,
   },
   bubble: {
     borderRadius: 14,

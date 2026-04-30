@@ -6,14 +6,20 @@ type Props = {
   onPick: (emoji: string) => void;
   align?: "start" | "end";
   position?: "above" | "below";
+  absolute?: boolean;
 };
 
-export function ReactionPicker({ onPick, align = "start", position = "above" }: Props) {
+export function ReactionPicker({
+  onPick,
+  align = "start",
+  position = "above",
+  absolute = true,
+}: Props) {
   return (
     <View
       pointerEvents="box-none"
       style={[
-        styles.wrapper,
+        absolute ? styles.wrapperAbsolute : styles.wrapperInline,
         position === "above" ? styles.posAbove : styles.posBelow,
         align === "end" ? styles.alignEnd : styles.alignStart,
       ]}
@@ -35,15 +41,19 @@ export function ReactionPicker({ onPick, align = "start", position = "above" }: 
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
+  wrapperAbsolute: {
     position: "absolute",
+    zIndex: 50,
+  },
+  wrapperInline: {
+    position: "relative",
     zIndex: 50,
   },
   posAbove: {
     top: -46,
   },
   posBelow: {
-    bottom: -46,
+    top: 8,
   },
   alignStart: {
     left: 0,
