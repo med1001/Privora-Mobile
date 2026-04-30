@@ -197,8 +197,16 @@ export function MessageBubble({
     onToggleReveal();
   };
 
+  const hasReactions = reactionEntries.length > 0;
+
   return (
-    <View style={[styles.outer, mine ? styles.outerMine : styles.outerPeer]}>
+    <View
+      style={[
+        styles.outer,
+        mine ? styles.outerMine : styles.outerPeer,
+        hasReactions && styles.outerWithReactions,
+      ]}
+    >
       <Pressable
         style={[
           styles.bubble,
@@ -223,7 +231,7 @@ export function MessageBubble({
           />
         )}
 
-        {reactionEntries.length > 0 && (
+        {hasReactions && (
           <View style={[styles.reactionsRow, mine ? styles.reactionsMine : styles.reactionsPeer]}>
             {Object.entries(
               reactionEntries.reduce<Record<string, number>>((acc, [, emoji]) => {
@@ -266,6 +274,11 @@ const styles = StyleSheet.create({
   },
   outerPeer: {
     alignSelf: "flex-start",
+  },
+  // Reserve room under the bubble when a reaction pill is overlapping its
+  // bottom edge, so the next message doesn't get visually glued to it.
+  outerWithReactions: {
+    marginBottom: 18,
   },
   bubble: {
     borderRadius: 14,
