@@ -17,14 +17,23 @@ export type UploadResponse = {
 };
 
 async function apiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${config.apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  });
+  const url = `${config.apiBaseUrl}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `${msg} (${url}). Is the backend running on :8000? On a real phone set EXPO_PUBLIC_API_HOST in .env.local to your PC IP (or 127.0.0.1 + adb reverse), then rebuild.`,
+    );
+  }
 
   if (!response.ok) {
     const body = await response.text();
@@ -64,13 +73,22 @@ export async function uploadAttachment(asset: UploadAsset, token: string): Promi
     type: asset.mimeType,
   } as unknown as Blob);
 
-  const response = await fetch(`${config.apiBaseUrl}/api/upload`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  });
+  const url = `${config.apiBaseUrl}/api/upload`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `${msg} (${url}). Check backend and EXPO_PUBLIC_API_HOST / adb reverse, then rebuild.`,
+    );
+  }
 
   if (!response.ok) {
     const body = await response.text();
