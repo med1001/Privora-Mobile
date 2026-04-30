@@ -1,13 +1,24 @@
 /**
- * API / WebSocket host for local development:
+ * API + WebSocket (port 8000) pour le dev local.
  *
- * - Android emulator (default): 10.0.2.2 → your PC's localhost from the AVD.
- * - Physical phone on same Wi‑Fi: set EXPO_PUBLIC_API_HOST to your PC's LAN IP
- *   (ipconfig → IPv4, e.g. 192.168.1.42). Allow port 8000 in Windows Firewall.
- * - Physical phone over USB (same URLs as emulator idea): set EXPO_PUBLIC_API_HOST=127.0.0.1
- *   and run: adb reverse tcp:8000 tcp:8000   (+ tcp:8081 for Metro if needed)
+ * Défaut (aucune variable) : host = 10.0.2.2 → émulateur Android vers ton PC.
  *
- * Rebuild the native app after changing EXPO_PUBLIC_API_HOST (expo run:android).
+ * Téléphone physique sans bloquer l’émulateur :
+ * - Garde `.env` pour Firebase uniquement (comme `.env.example`).
+ * - Crée un fichier `.env.local` (déjà ignoré par git) avec UNE ligne :
+ *     EXPO_PUBLIC_API_HOST=192.168.x.x
+ *   (IPv4 de ton PC, `ipconfig`, même Wi‑Fi que le téléphone ; pare-feu : port 8000.)
+ * - Rebuild : `npx expo run:android`
+ * - Pour repasser « émulateur seul » : supprime ou renomme `.env.local`, puis rebuild.
+ *
+ * Astuce : sur beaucoup de réseaux, la même IPv4 PC fonctionne pour l’émulateur ET
+ * le téléphone ; dans ce cas tu peux laisser `.env.local` en permanence.
+ *
+ * USB + reverse (comme du « localhost » sur le téléphone) :
+ *   EXPO_PUBLIC_API_HOST=127.0.0.1
+ *   puis : adb reverse tcp:8000 tcp:8000  (et tcp:8081 pour Metro si besoin)
+ *
+ * Tout changement de EXPO_PUBLIC_API_HOST exige un rebuild natif (pas seulement reload).
  */
 module.exports = ({ config }) => {
   const host = (process.env.EXPO_PUBLIC_API_HOST || "10.0.2.2").trim();
