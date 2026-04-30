@@ -440,7 +440,7 @@ export function ChatListScreen({ session, call }: Props) {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             onContentSizeChange={() => messageListRef.current?.scrollToEnd({ animated: false })}
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               const mine = isLocalMessage(item.senderId);
               const systemMessage = formatSystemMessage(item.text, mine);
               if (systemMessage) {
@@ -467,6 +467,7 @@ export function ChatListScreen({ session, call }: Props) {
                   message={item}
                   mine={mine}
                   revealed={revealedMessageId === item.id}
+                  pickerBelow={index < 2}
                   onToggleReveal={() =>
                     setRevealedMessageId((current) => (current === item.id ? null : item.id))
                   }

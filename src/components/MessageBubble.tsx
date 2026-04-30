@@ -22,6 +22,12 @@ type Props = {
   onReact: (emoji: string) => void;
   onPreviewImage: (url: string) => void;
   onRetry?: () => void;
+  /**
+   * If true, the reaction picker is rendered below the bubble instead of
+   * above. We use this for the topmost messages of the list so the picker
+   * is not occluded by the chat header.
+   */
+  pickerBelow?: boolean;
 };
 
 const SYSTEM_IMAGE_PREFIX = "__system_image:";
@@ -127,6 +133,7 @@ export function MessageBubble({
   onReact,
   onPreviewImage,
   onRetry,
+  pickerBelow = false,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const reactions = message.reactions ?? {};
@@ -208,6 +215,7 @@ export function MessageBubble({
         {pickerOpen && (
           <ReactionPicker
             align={mine ? "end" : "start"}
+            position={pickerBelow ? "below" : "above"}
             onPick={(emoji) => {
               setPickerOpen(false);
               onReact(emoji);

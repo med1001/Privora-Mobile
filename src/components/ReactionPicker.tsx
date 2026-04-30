@@ -5,13 +5,18 @@ export const REACTION_EMOJIS = ["\uD83D\uDC4D", "\u2764\uFE0F", "\uD83D\uDE02", 
 type Props = {
   onPick: (emoji: string) => void;
   align?: "start" | "end";
+  position?: "above" | "below";
 };
 
-export function ReactionPicker({ onPick, align = "start" }: Props) {
+export function ReactionPicker({ onPick, align = "start", position = "above" }: Props) {
   return (
     <View
       pointerEvents="box-none"
-      style={[styles.wrapper, align === "end" ? styles.alignEnd : styles.alignStart]}
+      style={[
+        styles.wrapper,
+        position === "above" ? styles.posAbove : styles.posBelow,
+        align === "end" ? styles.alignEnd : styles.alignStart,
+      ]}
     >
       <View style={styles.bar}>
         {REACTION_EMOJIS.map((emoji) => (
@@ -32,7 +37,13 @@ export function ReactionPicker({ onPick, align = "start" }: Props) {
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
+    zIndex: 50,
+  },
+  posAbove: {
     top: -46,
+  },
+  posBelow: {
+    bottom: -46,
   },
   alignStart: {
     left: 0,
