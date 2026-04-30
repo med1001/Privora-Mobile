@@ -15,7 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Privora uses the microphone for voice calls with your contacts."
+        "NSMicrophoneUsageDescription": "Privora uses the microphone for voice calls and voice messages.",
+        "NSCameraUsageDescription": "Privora uses the camera so you can send photos in your conversations.",
+        "NSPhotoLibraryUsageDescription": "Privora needs photo library access to send images in your conversations.",
+        "NSPhotoLibraryAddUsageDescription": "Privora can save received images to your photo library."
       }
     },
     "android": {
@@ -30,11 +33,15 @@
         "android.permission.CHANGE_NETWORK_STATE",
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH_CONNECT"
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.PrivoraMobile"
+      "package": "com.anonymous.PrivoraMobile",
+      "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -50,7 +57,14 @@
       "firebaseAppId": "1:118761355969:web:210c4c457d7a0ed73e3240"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Privora needs photo library access to send images.",
+          "cameraPermission": "Privora needs camera access to take and send pictures."
+        }
+      ]
     ]
   }
 }
