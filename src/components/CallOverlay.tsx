@@ -49,8 +49,11 @@ export function CallOverlay({ callState, isMuted, onAccept, onReject, onHangup, 
   const [duration, setDuration] = useState(0);
 
   useEffect(() => {
+    // The microphone is captured during the call, so iOS recording must
+    // remain allowed; otherwise the WebRTC capture session conflicts with
+    // expo-av's playback session and audio breaks.
     Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
+      allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
