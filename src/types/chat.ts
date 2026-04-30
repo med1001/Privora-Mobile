@@ -2,10 +2,22 @@ export type WsIncomingMessage =
   | {
       type: "message";
       from: string;
+      to?: string;
       fromDisplayName?: string;
       message: string;
       msg_id?: string;
       timestamp?: string;
+      reactions?: Record<string, string>;
+    }
+  | {
+      type: "offline";
+      from: string;
+      to?: string;
+      fromDisplayName?: string;
+      message: string;
+      msg_id?: string;
+      timestamp?: string;
+      reactions?: Record<string, string>;
     }
   | {
       type: "history";
@@ -16,6 +28,7 @@ export type WsIncomingMessage =
         fromDisplayName?: string;
         message: string;
         timestamp?: string;
+        reactions?: Record<string, string>;
       }>;
     }
   | {
@@ -32,6 +45,13 @@ export type WsIncomingMessage =
       status: "online" | "offline";
     }
   | {
+      type: "reaction";
+      msg_id: string;
+      from: string;
+      to?: string;
+      reaction: string;
+    }
+  | {
       type: "error";
       message: string;
     }
@@ -40,6 +60,8 @@ export type WsIncomingMessage =
       [key: string]: any;
     };
 
+export type ChatMessageStatus = "sent" | "pending" | "failed";
+
 export type ChatMessage = {
   id: string;
   senderId: string;
@@ -47,6 +69,8 @@ export type ChatMessage = {
   senderName: string;
   text: string;
   timestamp: string;
+  reactions?: Record<string, string>;
+  status?: ChatMessageStatus;
 };
 
 export type ChatContact = {
