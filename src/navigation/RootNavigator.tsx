@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
@@ -12,7 +12,6 @@ import type { WsIncomingMessage } from "../types/chat";
 export type RootStackParamList = {
   Login: undefined;
   ChatList: undefined;
-  ChatRoom: { userId: string; displayName: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -42,7 +41,9 @@ export function RootNavigator() {
     },
   });
 
-  webrtcSignalRef.current = webrtc.handleWebRTCSignal;
+  useEffect(() => {
+    webrtcSignalRef.current = webrtc.handleWebRTCSignal;
+  }, [webrtc.handleWebRTCSignal]);
 
   if (initializing) {
     return (
@@ -75,16 +76,14 @@ export function RootNavigator() {
             options={{ title: "Privora Login", headerShown: false }}
           />
         ) : (
-          <>
-            <Stack.Screen
-              name="ChatList"
-              options={{
-                headerShown: false,
-              }}
-            >
-              {(props) => <ChatListScreen {...props} session={session} call={callProps} />}
-            </Stack.Screen>
-          </>
+          <Stack.Screen
+            name="ChatList"
+            options={{
+              headerShown: false,
+            }}
+          >
+            {(props) => <ChatListScreen {...props} session={session} call={callProps} />}
+          </Stack.Screen>
         )}
       </Stack.Navigator>
       {callProps ? (
