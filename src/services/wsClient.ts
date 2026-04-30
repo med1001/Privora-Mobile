@@ -5,6 +5,8 @@ type Listener = (payload: WsIncomingMessage) => void;
 type WsClientOptions = {
   onAuthError?: () => void;
   onError?: (message: string) => void;
+  onOpen?: () => void;
+  onClose?: () => void;
 };
 
 export class WsClient {
@@ -60,6 +62,7 @@ export class WsClient {
       this.send({ type: "login", token: this.token });
       this.send({ type: "signal_session_claim" });
       this.startPing();
+      this.options.onOpen?.();
     };
 
     this.socket.onmessage = (event) => {
@@ -73,6 +76,7 @@ export class WsClient {
 
     this.socket.onclose = (event) => {
       this.clearPing();
+      this.options.onClose?.();
       if (!this.shouldReconnect) return;
 
       if (event.code === 1008) {
