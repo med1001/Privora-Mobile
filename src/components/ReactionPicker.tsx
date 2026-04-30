@@ -6,20 +6,18 @@ type Props = {
   onPick: (emoji: string) => void;
   align?: "start" | "end";
   position?: "above" | "below";
-  absolute?: boolean;
 };
 
-export function ReactionPicker({
-  onPick,
-  align = "start",
-  position = "above",
-  absolute = true,
-}: Props) {
+/**
+ * Emoji bar anchored to a relatively-positioned parent (the bubble cluster).
+ * Always absolutely positioned so it never stretches the chat bubble width.
+ */
+export function ReactionPicker({ onPick, align = "start", position = "above" }: Props) {
   return (
     <View
       pointerEvents="box-none"
       style={[
-        absolute ? styles.wrapperAbsolute : styles.wrapperInline,
+        styles.wrapper,
         position === "above" ? styles.posAbove : styles.posBelow,
         align === "end" ? styles.alignEnd : styles.alignStart,
       ]}
@@ -41,19 +39,17 @@ export function ReactionPicker({
 }
 
 const styles = StyleSheet.create({
-  wrapperAbsolute: {
+  wrapper: {
     position: "absolute",
     zIndex: 50,
   },
-  wrapperInline: {
-    position: "relative",
-    zIndex: 50,
-  },
   posAbove: {
-    top: -46,
+    bottom: "100%",
+    marginBottom: 6,
   },
   posBelow: {
-    top: 8,
+    top: "100%",
+    marginTop: 6,
   },
   alignStart: {
     left: 0,

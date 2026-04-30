@@ -201,50 +201,59 @@ export function MessageBubble({
 
   return (
     <View style={[styles.outer, mine ? styles.outerMine : styles.outerPeer]}>
-      <Pressable
-        style={[
-          styles.bubble,
-          mine ? styles.bubbleMine : styles.bubblePeer,
-          isImage && styles.bubbleImage,
-          message.status === "failed" && styles.bubbleFailed,
-        ]}
-        onLongPress={handleLongPress}
-        delayLongPress={350}
-        onPress={handlePress}
-      >
-        {content}
+      {/* Cluster keeps bubble width = message only; picker is absolute so it
+          never stretches the blue/white bubble to full row width. */}
+      <View style={[styles.bubbleCluster, mine ? styles.bubbleClusterMine : styles.bubbleClusterPeer]}>
+        <Pressable
+          style={[
+            styles.bubble,
+            mine ? styles.bubbleMine : styles.bubblePeer,
+            isImage && styles.bubbleImage,
+            message.status === "failed" && styles.bubbleFailed,
+          ]}
+          onLongPress={handleLongPress}
+          delayLongPress={350}
+          onPress={handlePress}
+        >
+          {content}
+
+          {hasReactions && (
+            <View style={[styles.reactionsRow, mine ? styles.reactionsMine : styles.reactionsPeer]}>
+              {Object.entries(
+                reactionEntries.reduce<Record<string, number>>((acc, [, emoji]) => {
+                  acc[emoji] = (acc[emoji] ?? 0) + 1;
+                  return acc;
+                }, {}),
+              ).map(([emoji, count]) => (
+                <View key={emoji} style={styles.reactionPill}>
+                  <Text style={styles.reactionEmoji}>{emoji}</Text>
+                  {count > 1 && <Text style={styles.reactionCount}>{count}</Text>}
+                </View>
+              ))}
+            </View>
+          )}
+        </Pressable>
 
         {pickerOpen && (
           <ReactionPicker
             align={mine ? "end" : "start"}
             position={pickerBelow ? "below" : "above"}
-            absolute={!pickerBelow}
             onPick={(emoji) => {
               setPickerOpen(false);
               onReact(emoji);
             }}
           />
         )}
-
-        {hasReactions && (
-          <View style={[styles.reactionsRow, mine ? styles.reactionsMine : styles.reactionsPeer]}>
-            {Object.entries(
-              reactionEntries.reduce<Record<string, number>>((acc, [, emoji]) => {
-                acc[emoji] = (acc[emoji] ?? 0) + 1;
-                return acc;
-              }, {}),
-            ).map(([emoji, count]) => (
-              <View key={emoji} style={styles.reactionPill}>
-                <Text style={styles.reactionEmoji}>{emoji}</Text>
-                {count > 1 && <Text style={styles.reactionCount}>{count}</Text>}
-              </View>
-            ))}
-          </View>
-        )}
-      </Pressable>
+      </View>
 
       {revealed && (
-        <Text style={[styles.timestamp, mine ? styles.timestampMine : styles.timestampPeer]}>
+        <Text
+          style={[
+            styles.timestamp,
+            mine ? styles.timestampMine : styles.timestampPeer,
+            hasReactions && styles.timestampBelowReactions,
+          ]}
+        >
           {formatTimestamp(message.timestamp)}
         </Text>
       )}
@@ -269,6 +278,16 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
   },
   outerPeer: {
+    alignSelf: "flex-start",
+  },
+  bubbleCluster: {
+    position: "relative",
+    maxWidth: "100%",
+  },
+  bubbleClusterMine: {
+    alignSelf: "flex-end",
+  },
+  bubbleClusterPeer: {
     alignSelf: "flex-start",
   },
   bubble: {
@@ -394,6 +413,11 @@ const styles = StyleSheet.create({
   },
   timestampPeer: {
     alignSelf: "flex-start",
+  },
+  // Reaction pills sit ~12px below the bubble; leave room so the revealed
+  // timestamp never sits under the pill (especially on right-aligned mine).
+  timestampBelowReactions: {
+    marginTop: 22,
   },
   failedRow: {
     flexDirection: "row",
