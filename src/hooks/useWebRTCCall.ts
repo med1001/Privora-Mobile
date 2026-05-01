@@ -113,6 +113,12 @@ export function useWebRTCCall(args: {
   const callingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionLossTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasEmittedCallConnectedRef = useRef(false);
+  // When set, the next incoming call_offer with this callId is accepted
+  // automatically and the user-visible "ringing" state is skipped. Used
+  // by the FCM push -> Notifee "Answer" action flow so that pressing
+  // Answer in the heads-up notification lands directly on the
+  // "Connecting..." UI instead of flashing through the in-app ringing UI.
+  const autoAcceptCallIdRef = useRef<string | null>(null);
   const onCallEndedRef = useRef(onCallEnded);
   onCallEndedRef.current = onCallEnded;
 
@@ -403,51 +409,60 @@ export function useWebRTCCall(args: {
     ],
   );
 
+  // Body of the accept flow, decoupled from `callState`. Callable both
+  // from the user-driven `acceptCall` button and from the auto-accept
+  // path triggered by an FCM push notification.
+  const acceptCallInternal = useCallback(
+    async (peerId: string, callId: string) => {
+      if (ringingTimeoutRef.current) {
+        clearTimeout(ringingTimeoutRef.current);
+        ringingTimeoutRef.current = null;
+      }
+      setCallState((prev) =>
+        prev.callId === callId && prev.status !== "connecting" ? { ...prev, status: "connecting" } : prev,
+      );
+
+      try {
+        const granted = await ensureMicPermission();
+        if (!granted) {
+          sendRaw({ type: "call_reject", to: peerId, callId, reason: "permission_denied" });
+          cleanupCall(false);
+          Alert.alert("Microphone", "Microphone permission is required to answer a call.");
+          return;
+        }
+        beginCallAudioSession();
+        const stream = await mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
+        localStreamRef.current = stream;
+        const pc = pcRef.current;
+        if (!pc) throw new Error("Peer connection not ready");
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+        const answer = await pc.createAnswer();
+        const answerOut = toSessionDescriptionInit(answer, "answer");
+        await pc.setLocalDescription(answerOut);
+        await flushQueuedIceCandidates(callId, pc);
+
+        sendRaw({ type: "call_accepting", to: peerId, callId });
+        sendRaw({ type: "call_answer", to: peerId, callId, answer: answerOut });
+      } catch {
+        cleanupCall(false);
+        Alert.alert("Microphone", "Could not access microphone.");
+      }
+    },
+    [beginCallAudioSession, cleanupCall, flushQueuedIceCandidates, sendRaw],
+  );
+
   const acceptCall = useCallback(async () => {
     if (callState.status !== "ringing" || !callState.peerId || !callState.callId) return;
-    const peerId = callState.peerId;
-    const callId = callState.callId;
-    if (ringingTimeoutRef.current) {
-      clearTimeout(ringingTimeoutRef.current);
-      ringingTimeoutRef.current = null;
-    }
-    setCallState((prev) => (prev.callId === callId ? { ...prev, status: "connecting" } : prev));
+    await acceptCallInternal(callState.peerId, callState.callId);
+  }, [acceptCallInternal, callState.callId, callState.peerId, callState.status]);
 
-    try {
-      const granted = await ensureMicPermission();
-      if (!granted) {
-        sendRaw({ type: "call_reject", to: peerId, callId, reason: "permission_denied" });
-        cleanupCall(false);
-        Alert.alert("Microphone", "Microphone permission is required to answer a call.");
-        return;
-      }
-      beginCallAudioSession();
-      const stream = await mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
-      localStreamRef.current = stream;
-      const pc = pcRef.current;
-      if (!pc) throw new Error("Peer connection not ready");
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-      const answer = await pc.createAnswer();
-      const answerOut = toSessionDescriptionInit(answer, "answer");
-      await pc.setLocalDescription(answerOut);
-      await flushQueuedIceCandidates(callId, pc);
-
-      sendRaw({ type: "call_accepting", to: peerId, callId });
-      sendRaw({ type: "call_answer", to: peerId, callId, answer: answerOut });
-    } catch {
-      cleanupCall(false);
-      Alert.alert("Microphone", "Could not access microphone.");
-    }
-  }, [
-    beginCallAudioSession,
-    callState.callId,
-    callState.peerId,
-    callState.status,
-    cleanupCall,
-    flushQueuedIceCandidates,
-    sendRaw,
-  ]);
+  // Pre-arm auto-accept for a specific incoming call. The next matching
+  // `call_offer` will skip the ringing UI entirely. Caller is responsible
+  // for clearing it (or the hook clears it when consumed).
+  const armAutoAccept = useCallback((callId: string | null) => {
+    autoAcceptCallIdRef.current = callId;
+  }, []);
 
   const rejectCall = useCallback(() => {
     if (callState.peerId && callState.callId) {
@@ -488,6 +503,13 @@ export function useWebRTCCall(args: {
           return;
         }
 
+        // If this call was pre-armed for auto-accept (user pressed
+        // "Answer" on a heads-up notification while the app was killed
+        // or backgrounded), skip the user-visible ringing state and go
+        // straight to "connecting".
+        const isAutoAccept = autoAcceptCallIdRef.current === callId;
+        if (isAutoAccept) autoAcceptCallIdRef.current = null;
+
         currentCallIdRef.current = callId;
         if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
         ringingTimeoutRef.current = setTimeout(() => {
@@ -497,7 +519,7 @@ export function useWebRTCCall(args: {
         }, 45000);
 
         setCallState({
-          status: "ringing",
+          status: isAutoAccept ? "connecting" : "ringing",
           peerId: from,
           peerName: (parsed.fromDisplayName as string) || from,
           isIncoming: true,
@@ -514,6 +536,9 @@ export function useWebRTCCall(args: {
             await pc.setRemoteDescription(new RTCSessionDescription({ sdp: offer.sdp, type: offer.type }));
             await flushQueuedIceCandidates(callId, pc);
             sendRaw({ type: "call_ring", to: from, callId });
+            if (isAutoAccept) {
+              await acceptCallInternal(from, callId);
+            }
           } catch {
             sendRaw({ type: "call_reject", to: from, callId, reason: "setup_failed" });
             cleanupCall(false);
@@ -592,7 +617,7 @@ export function useWebRTCCall(args: {
         cleanupCall(true);
       }
     },
-    [cleanupCall, createPeerConnection, flushQueuedIceCandidates, resetPeerConnection, sendRaw],
+    [acceptCallInternal, cleanupCall, createPeerConnection, flushQueuedIceCandidates, resetPeerConnection, sendRaw],
   );
 
   useEffect(() => {
@@ -612,5 +637,6 @@ export function useWebRTCCall(args: {
     rejectCall,
     endCall,
     handleWebRTCSignal,
+    armAutoAccept,
   };
 }

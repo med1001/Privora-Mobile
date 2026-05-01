@@ -4,17 +4,21 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
+    "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-firebase/app": "^24.0.0",
+    "@react-native-firebase/messaging": "^24.0.0",
     "@react-navigation/native": "^7.2.2",
     "@react-navigation/native-stack": "^7.14.12",
     "expo": "~54.0.34",
     "expo-av": "~16.0.8",
+    "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
     "expo-document-picker": "~14.0.8",

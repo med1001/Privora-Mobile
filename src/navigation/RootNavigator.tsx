@@ -6,6 +6,7 @@ import { LoginScreen } from "../screens/LoginScreen";
 import { ChatListScreen } from "../screens/ChatListScreen";
 import { useChatSession } from "../hooks/useChatSession";
 import { useWebRTCCall } from "../hooks/useWebRTCCall";
+import { useIncomingCallBridge } from "../hooks/useIncomingCallBridge";
 import { CallOverlay } from "../components/CallOverlay";
 import type { WsIncomingMessage } from "../types/chat";
 import {
@@ -48,6 +49,18 @@ export function RootNavigator() {
   useEffect(() => {
     webrtcSignalRef.current = webrtc.handleWebRTCSignal;
   }, [webrtc.handleWebRTCSignal]);
+
+  // Connect FCM data messages + Notifee Answer/Decline action presses to
+  // the existing WebRTC call hook. When the user taps "Answer" on the
+  // notification, this auto-runs `acceptCall` once the queued
+  // `call_offer` arrives over the WebSocket.
+  useIncomingCallBridge({
+    isAuthenticated: user != null,
+    callState: webrtc.callState,
+    acceptCall: webrtc.acceptCall,
+    rejectCall: webrtc.rejectCall,
+    armAutoAccept: webrtc.armAutoAccept,
+  });
 
   // Register the device for incoming-call push notifications once we know
   // who is logged in. The call is idempotent and silently no-ops on

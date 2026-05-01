@@ -60,6 +60,7 @@
     },
     "plugins": [
       "expo-secure-store",
+      "@react-native-firebase/app",
       [
         "expo-image-picker",
         {
@@ -73,6 +74,17 @@
           "icon": "./assets/icon.png",
           "color": "#2563eb",
           "sounds": ["./assets/sounds/ringing.mp3"]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": []
+          },
+          "ios": {
+            "useFrameworks": "static"
+          }
         }
       ]
     ]

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFirebaseAuth } from "../services/firebase";
+import { cacheIdToken, clearCachedIdToken } from "../services/incomingCallActions";
 
 type AuthContextValue = {
   user: User | null;
@@ -18,9 +19,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const auth = getFirebaseAuth();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
       setInitializing(false);
+      if (nextUser) {
+        try {
+          const token = await nextUser.getIdToken();
+          await cacheIdToken(token);
+        } catch {
+          // best-effort; the token will be refreshed on the next API call.
+        }
+      } else {
+        await clearCachedIdToken();
+      }
     });
 
     return unsubscribe;
@@ -37,13 +48,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await signOut(auth);
       },
       async getIdToken() {
-        if (user) {
-          return user.getIdToken();
-        }
-        if (!auth.currentUser) {
+        const target = user ?? auth.currentUser;
+        if (!target) {
           throw new Error("No authenticated user found.");
         }
-        return auth.currentUser.getIdToken();
+        const token = await target.getIdToken();
+        await cacheIdToken(token);
+        return token;
       },
     }),
     [auth, initializing, user],
