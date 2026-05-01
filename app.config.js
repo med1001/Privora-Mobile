@@ -20,10 +20,28 @@
  *
  * Tout changement de EXPO_PUBLIC_API_HOST exige un rebuild natif (pas seulement reload).
  */
+const fs = require("fs");
+const path = require("path");
+
 module.exports = ({ config }) => {
   const host = (process.env.EXPO_PUBLIC_API_HOST || "10.0.2.2").trim();
+
+  // Only declare googleServicesFile when the JSON is actually present, so
+  // the build does not fail before the developer downloads it. See
+  // docs/push-notifications-setup.md for setup steps.
+  const googleServicesPath = path.join(__dirname, "google-services.json");
+  const hasGoogleServicesFile = fs.existsSync(googleServicesPath);
+
+  const android = { ...(config.android ?? {}) };
+  if (hasGoogleServicesFile) {
+    android.googleServicesFile = "./google-services.json";
+  } else {
+    delete android.googleServicesFile;
+  }
+
   return {
     ...config,
+    android,
     extra: {
       ...(config.extra ?? {}),
       apiBaseUrl: `http://${host}:8000`,

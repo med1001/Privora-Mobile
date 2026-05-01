@@ -57,7 +57,8 @@ and the mobile client (`Privora-Mobile`).
 ## Calls (WebRTC)
 - Offer / answer / ICE state machine ✅
 - Ringing, timeout (45 s), reject, end semantics ✅
-- Mute toggle, speaker info alert (system routing) ✅
+- Mute toggle ✅
+- Speaker / earpiece toggle via `react-native-incall-manager` ✅
 - Reconnect window (10 s) with `connection_lost` fallback ✅
 - Call summary system messages (`__system_call:missed` / `__system_call:ended:mm:ss`) ✅
 - Ringtones for `calling`, `ringing`, `calling_offline` ✅
@@ -66,7 +67,7 @@ and the mobile client (`Privora-Mobile`).
 
 ## Notifications
 - Message-notification sound (`messenger.mp3`) when chat is not focused ✅
-- Push notifications (FCM / APNs) ❌ (parity item; web also relies on focus + sound)
+- FCM push for incoming calls (rings when app backgrounded / killed) ✅ – needs `google-services.json` (see `docs/push-notifications-setup.md`)
 
 ## UI / Theme
 - Animated drawer for the contact list on phones ✅

@@ -36,7 +36,11 @@
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.READ_MEDIA_IMAGES"
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.FOREGROUND_SERVICE"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -61,6 +65,14 @@
         {
           "photosPermission": "Privora needs photo library access to send images.",
           "cameraPermission": "Privora needs camera access to take and send pictures."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2563eb",
+          "sounds": ["./assets/sounds/ringing.mp3"]
         }
       ]
     ]

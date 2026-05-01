@@ -56,6 +56,20 @@ export function fetchRtcConfig(token: string) {
   });
 }
 
+export function registerPushToken(token: string, deviceToken: string, platform: "android" | "ios" | "web") {
+  return apiFetch<{ ok: boolean }>("/api/push/register", token, {
+    method: "POST",
+    body: JSON.stringify({ token: deviceToken, platform }),
+  });
+}
+
+export function unregisterPushToken(token: string, deviceToken: string) {
+  return apiFetch<{ ok: boolean }>("/api/push/unregister", token, {
+    method: "POST",
+    body: JSON.stringify({ token: deviceToken }),
+  });
+}
+
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export type UploadAsset = {
