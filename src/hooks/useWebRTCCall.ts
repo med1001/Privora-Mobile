@@ -8,6 +8,7 @@ import {
   mediaDevices,
 } from "react-native-webrtc";
 import { fetchRtcConfig } from "../services/api";
+import { callAudio } from "../services/callAudio";
 
 async function ensureMicPermission(): Promise<boolean> {
   if (Platform.OS !== "android") return true;
@@ -98,8 +99,10 @@ export function useWebRTCCall(args: {
     callId: null,
   });
   const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaker, setIsSpeaker] = useState(false);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const audioSessionActiveRef = useRef(false);
   const localStreamRef = useRef<MediaStream | null>(null);
   const callStartTimeRef = useRef<number | null>(null);
   const currentCallIdRef = useRef<string | null>(null);
@@ -178,6 +181,28 @@ export function useWebRTCCall(args: {
     }
   }, []);
 
+  const beginCallAudioSession = useCallback(() => {
+    if (audioSessionActiveRef.current) return;
+    audioSessionActiveRef.current = true;
+    callAudio.startSession();
+    setIsSpeaker(false);
+  }, []);
+
+  const endCallAudioSession = useCallback(() => {
+    if (!audioSessionActiveRef.current) return;
+    audioSessionActiveRef.current = false;
+    callAudio.stopSession();
+    setIsSpeaker(false);
+  }, []);
+
+  const toggleSpeaker = useCallback(() => {
+    setIsSpeaker((prev) => {
+      const next = !prev;
+      callAudio.setSpeakerphone(next);
+      return next;
+    });
+  }, []);
+
   const cleanupCall = useCallback(
     (recordEnd: boolean = true) => {
       clearCallTimers();
@@ -188,6 +213,7 @@ export function useWebRTCCall(args: {
       }
 
       resetPeerConnection();
+      endCallAudioSession();
       setIsMuted(false);
 
       const previousState = callStateRef.current;
@@ -226,7 +252,7 @@ export function useWebRTCCall(args: {
       callStateRef.current = idleState;
       setCallState(idleState);
     },
-    [clearCallTimers, resetPeerConnection],
+    [clearCallTimers, endCallAudioSession, resetPeerConnection],
   );
 
   const createPeerConnection = useCallback(
@@ -335,6 +361,7 @@ export function useWebRTCCall(args: {
           return;
         }
 
+        beginCallAudioSession();
         const stream = await mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
         localStreamRef.current = stream;
         const pc = createPeerConnection(peerId, callId);
@@ -364,7 +391,16 @@ export function useWebRTCCall(args: {
         Alert.alert("Microphone", "Could not access microphone.");
       }
     },
-    [clearCallTimers, cleanupCall, createPeerConnection, localDisplayName, localUserId, resetPeerConnection, sendRaw],
+    [
+      beginCallAudioSession,
+      clearCallTimers,
+      cleanupCall,
+      createPeerConnection,
+      localDisplayName,
+      localUserId,
+      resetPeerConnection,
+      sendRaw,
+    ],
   );
 
   const acceptCall = useCallback(async () => {
@@ -385,6 +421,7 @@ export function useWebRTCCall(args: {
         Alert.alert("Microphone", "Microphone permission is required to answer a call.");
         return;
       }
+      beginCallAudioSession();
       const stream = await mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
       localStreamRef.current = stream;
       const pc = pcRef.current;
@@ -402,7 +439,15 @@ export function useWebRTCCall(args: {
       cleanupCall(false);
       Alert.alert("Microphone", "Could not access microphone.");
     }
-  }, [callState.callId, callState.peerId, callState.status, cleanupCall, flushQueuedIceCandidates, sendRaw]);
+  }, [
+    beginCallAudioSession,
+    callState.callId,
+    callState.peerId,
+    callState.status,
+    cleanupCall,
+    flushQueuedIceCandidates,
+    sendRaw,
+  ]);
 
   const rejectCall = useCallback(() => {
     if (callState.peerId && callState.callId) {
@@ -559,7 +604,9 @@ export function useWebRTCCall(args: {
   return {
     callState,
     isMuted,
+    isSpeaker,
     toggleMute,
+    toggleSpeaker,
     initiateCall,
     acceptCall,
     rejectCall,

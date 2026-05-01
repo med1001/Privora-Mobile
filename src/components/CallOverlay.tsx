@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import type { CallState } from "../hooks/useWebRTCCall";
@@ -7,10 +7,12 @@ import type { CallState } from "../hooks/useWebRTCCall";
 type Props = {
   callState: CallState;
   isMuted: boolean;
+  isSpeaker: boolean;
   onAccept: () => void;
   onReject: () => void;
   onHangup: () => void;
   onToggleMute: () => void;
+  onToggleSpeaker: () => void;
 };
 
 const CALLING_SOUND = require("../../assets/sounds/calling.mp3");
@@ -42,7 +44,16 @@ function statusLabel(status: CallState["status"], duration: number) {
   }
 }
 
-export function CallOverlay({ callState, isMuted, onAccept, onReject, onHangup, onToggleMute }: Props) {
+export function CallOverlay({
+  callState,
+  isMuted,
+  isSpeaker,
+  onAccept,
+  onReject,
+  onHangup,
+  onToggleMute,
+  onToggleSpeaker,
+}: Props) {
   const visible = callState.status !== "idle";
   const soundRef = useRef<Audio.Sound | null>(null);
   const currentTrackRef = useRef<"calling" | "ringing" | "offline" | null>(null);
@@ -210,16 +221,16 @@ export function CallOverlay({ callState, isMuted, onAccept, onReject, onHangup, 
                   />
                 </Pressable>
                 <Pressable
-                  style={[styles.roundBtn, styles.speaker]}
-                  onPress={() =>
-                    Alert.alert(
-                      "Speaker",
-                      "Audio routing is managed by the system during a call. Use the Android volume / output picker to switch between earpiece, speaker or Bluetooth.",
-                    )
-                  }
-                  accessibilityLabel="Speaker info"
+                  style={[styles.roundBtn, isSpeaker ? styles.speakerOn : styles.speakerOff]}
+                  onPress={onToggleSpeaker}
+                  accessibilityLabel={isSpeaker ? "Switch to earpiece" : "Switch to speaker"}
+                  accessibilityState={{ selected: isSpeaker }}
                 >
-                  <Ionicons name="volume-high" size={26} color="#2563eb" />
+                  <Ionicons
+                    name={isSpeaker ? "volume-high" : "ear"}
+                    size={26}
+                    color={isSpeaker ? "#ffffff" : "#2563eb"}
+                  />
                 </Pressable>
                 <Pressable
                   style={[styles.roundBtn, styles.hangup]}
@@ -312,8 +323,11 @@ const styles = StyleSheet.create({
   muteOff: {
     backgroundColor: "#f3f4f6",
   },
-  speaker: {
+  speakerOff: {
     backgroundColor: "#dbeafe",
+  },
+  speakerOn: {
+    backgroundColor: "#2563eb",
   },
   hangup: {
     width: 76,

@@ -30,7 +30,9 @@ import { ImagePreviewModal } from "../components/ImagePreviewModal";
 type CallControls = {
   callState: CallState;
   isMuted: boolean;
+  isSpeaker: boolean;
   toggleMute: () => void;
+  toggleSpeaker: () => void;
   initiateCall: (peerId: string, peerName: string) => void;
   acceptCall: () => void;
   rejectCall: () => void;

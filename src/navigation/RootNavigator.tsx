@@ -58,7 +58,9 @@ export function RootNavigator() {
       ? {
           callState: webrtc.callState,
           isMuted: webrtc.isMuted,
+          isSpeaker: webrtc.isSpeaker,
           toggleMute: webrtc.toggleMute,
+          toggleSpeaker: webrtc.toggleSpeaker,
           initiateCall: webrtc.initiateCall,
           acceptCall: webrtc.acceptCall,
           rejectCall: webrtc.rejectCall,
@@ -90,10 +92,12 @@ export function RootNavigator() {
         <CallOverlay
           callState={callProps.callState}
           isMuted={callProps.isMuted}
+          isSpeaker={callProps.isSpeaker}
           onAccept={callProps.acceptCall}
           onReject={callProps.rejectCall}
           onHangup={callProps.endCall}
           onToggleMute={callProps.toggleMute}
+          onToggleSpeaker={callProps.toggleSpeaker}
         />
       ) : null}
     </>
