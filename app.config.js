@@ -1,30 +1,65 @@
 /**
- * API + WebSocket (port 8000) pour le dev local.
+ * API + WebSocket URLs baked into the native build via `expo.extra`.
  *
- * Défaut (aucune variable) : host = 10.0.2.2 → émulateur Android vers ton PC.
+ * Default: production at https://privora-app.com (TLS).
+ * Override for local dev via `.env.local` — see docs/backend-environment.md.
  *
- * Téléphone physique sans bloquer l’émulateur :
- * - Garde `.env` pour Firebase uniquement (comme `.env.example`).
- * - Crée un fichier `.env.local` (déjà ignoré par git) avec UNE ligne :
- *     EXPO_PUBLIC_API_HOST=192.168.x.x
- *   (IPv4 de ton PC, `ipconfig`, même Wi‑Fi que le téléphone ; pare-feu : port 8000.)
- * - Rebuild : `npx expo run:android`
- * - Pour repasser « émulateur seul » : supprime ou renomme `.env.local`, puis rebuild.
- *
- * Astuce : sur beaucoup de réseaux, la même IPv4 PC fonctionne pour l’émulateur ET
- * le téléphone ; dans ce cas tu peux laisser `.env.local` en permanence.
- *
- * USB + reverse (comme du « localhost » sur le téléphone) :
- *   EXPO_PUBLIC_API_HOST=127.0.0.1
- *   puis : adb reverse tcp:8000 tcp:8000  (et tcp:8081 pour Metro si besoin)
- *
- * Tout changement de EXPO_PUBLIC_API_HOST exige un rebuild natif (pas seulement reload).
+ * Any change to EXPO_PUBLIC_* env vars requires a native rebuild:
+ *   npx expo run:android   (or run:ios)
+ * Metro reload alone is not enough.
  */
 const fs = require("fs");
 const path = require("path");
 
+/**
+ * @returns {{ apiBaseUrl: string; wsUrl: string }}
+ */
+function buildApiUrls() {
+  const explicit = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (explicit) {
+    const base = explicit.replace(/\/$/, "");
+    const wsUrl = base.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + "/ws";
+    return { apiBaseUrl: base, wsUrl };
+  }
+
+  const host = (process.env.EXPO_PUBLIC_API_HOST ?? "privora-app.com").trim();
+  const portRaw = process.env.EXPO_PUBLIC_API_PORT?.trim();
+  const tlsRaw = process.env.EXPO_PUBLIC_API_USE_TLS?.trim().toLowerCase();
+
+  const looksLikeLocalDev =
+    host === "10.0.2.2" ||
+    host === "127.0.0.1" ||
+    host === "localhost" ||
+    /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+
+  const hasExplicitTls =
+    tlsRaw === "true" || tlsRaw === "1" || tlsRaw === "false" || tlsRaw === "0";
+  const useTls = hasExplicitTls
+    ? tlsRaw === "true" || tlsRaw === "1"
+    : !looksLikeLocalDev && !portRaw;
+
+  if (useTls) {
+    if (portRaw) {
+      return {
+        apiBaseUrl: `https://${host}:${portRaw}`,
+        wsUrl: `wss://${host}:${portRaw}/ws`,
+      };
+    }
+    return {
+      apiBaseUrl: `https://${host}`,
+      wsUrl: `wss://${host}/ws`,
+    };
+  }
+
+  const port = portRaw || "8000";
+  return {
+    apiBaseUrl: `http://${host}:${port}`,
+    wsUrl: `ws://${host}:${port}/ws`,
+  };
+}
+
 module.exports = ({ config }) => {
-  const host = (process.env.EXPO_PUBLIC_API_HOST || "10.0.2.2").trim();
+  const { apiBaseUrl, wsUrl } = buildApiUrls();
 
   // Only declare googleServicesFile when the JSON is actually present, so
   // the build does not fail before the developer downloads it. See
@@ -44,8 +79,8 @@ module.exports = ({ config }) => {
     android,
     extra: {
       ...(config.extra ?? {}),
-      apiBaseUrl: `http://${host}:8000`,
-      wsUrl: `ws://${host}:8000/ws`,
+      apiBaseUrl,
+      wsUrl,
     },
   };
 };

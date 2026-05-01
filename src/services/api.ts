@@ -31,7 +31,7 @@ async function apiFetch<T>(path: string, token: string, init?: RequestInit): Pro
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(
-      `${msg} (${url}). Is the backend running on :8000? On a real phone set EXPO_PUBLIC_API_HOST in .env.local to your PC IP (or 127.0.0.1 + adb reverse), then rebuild.`,
+      `${msg} (${url}). Check network / TLS and that the API base URL matches your build (see docs/backend-environment.md). For a local backend, set EXPO_PUBLIC_API_* in .env.local and rebuild.`,
     );
   }
 
