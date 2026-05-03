@@ -460,6 +460,7 @@ export function ChatListScreen({ session, call }: Props) {
             contentContainerStyle={styles.messageList}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            removeClippedSubviews={false}
             onContentSizeChange={() => messageListRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item, index }) => {
               const mine = isLocalMessage(item.senderId);

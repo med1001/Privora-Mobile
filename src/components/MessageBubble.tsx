@@ -189,11 +189,13 @@ export function MessageBubble({
   }
 
   const handleLongPress = () => {
+    onReactionPickerVisibilityChange?.(true);
     setPickerOpen(true);
   };
 
   const handlePress = () => {
     if (pickerOpen) {
+      onReactionPickerVisibilityChange?.(false);
       setPickerOpen(false);
       return;
     }
@@ -201,10 +203,6 @@ export function MessageBubble({
   };
 
   const hasReactions = reactionEntries.length > 0;
-
-  useEffect(() => {
-    onReactionPickerVisibilityChange?.(pickerOpen);
-  }, [pickerOpen, onReactionPickerVisibilityChange]);
 
   return (
     <View style={[styles.outer, mine ? styles.outerMine : styles.outerPeer]}>
@@ -246,6 +244,7 @@ export function MessageBubble({
             align={mine ? "end" : "start"}
             position={pickerBelow ? "below" : "above"}
             onPick={(emoji) => {
+              onReactionPickerVisibilityChange?.(false);
               setPickerOpen(false);
               onReact(emoji);
             }}
