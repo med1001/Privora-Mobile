@@ -365,19 +365,19 @@ export function ChatListScreen({ session, call }: Props) {
               <Ionicons name="menu" size={24} color="#dbeafe" />
             </Pressable>
           )}
-          <View style={styles.headerAvatar}>
-            <Text style={styles.headerAvatarText}>
-              {(selectedContact ? toDisplayName(selectedContact.displayName, selectedContact.userId) : "C")
-                .charAt(0)
-                .toUpperCase()}
-            </Text>
-          </View>
+          {selectedContact ? (
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerAvatarText}>
+                {toDisplayName(selectedContact.displayName, selectedContact.userId).charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          ) : null}
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {selectedContact
-                ? toDisplayName(selectedContact.displayName, selectedContact.userId)
-                : "No user selected"}
-            </Text>
+            {selectedContact ? (
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {toDisplayName(selectedContact.displayName, selectedContact.userId)}
+              </Text>
+            ) : null}
             {!session.wsReady && (
               <View style={styles.wsStatusRow}>
                 <Ionicons name="cloud-offline" size={11} color="#fde68a" />
