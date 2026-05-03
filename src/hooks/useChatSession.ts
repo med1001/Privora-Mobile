@@ -151,6 +151,10 @@ export function useChatSession(options?: UseChatSessionOptions) {
       wsRef.current = null;
       setWsReady(false);
       setLastError(null);
+      setSelectedChatUserId(null);
+      setMessagesByUser({});
+      setUnreadByUser({});
+      setContacts([]);
       return;
     }
 
