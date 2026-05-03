@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -60,6 +61,13 @@ export function ChatListScreen({ session, call }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const drawerTranslateX = useRef(new Animated.Value(-340)).current;
   const messageListRef = useRef<FlatList>(null);
+
+  /** Modal drawers do not always receive safe-area insets on Android; combine with StatusBar height. */
+  const drawerTopInset = Math.max(
+    insets.top,
+    Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0,
+  );
+  const drawerBottomInset = Math.max(insets.bottom, 0);
 
   const isDesktopLike = width >= 900;
   const contacts = useMemo(() => session.contacts, [session.contacts]);
@@ -244,8 +252,8 @@ export function ChatListScreen({ session, call }: Props) {
         styles.sidebar,
         mobile ? styles.sidebarMobile : styles.sidebarDesktop,
         mobile && {
-          paddingTop: Math.max(insets.top, 0) + 12,
-          paddingBottom: Math.max(insets.bottom, 0) + 12,
+          paddingTop: 12,
+          paddingBottom: 12,
         },
       ]}
     >
@@ -534,7 +542,13 @@ export function ChatListScreen({ session, call }: Props) {
           <View style={styles.modalRoot}>
             <Pressable style={styles.backdrop} onPress={() => setDrawerOpen(false)} />
             <Animated.View style={[styles.modalSheet, { transform: [{ translateX: drawerTranslateX }] }]}>
-              {renderSidebar(true)}
+              <View style={styles.modalDrawerColumn}>
+                {/* Reserve status-bar / notch zone so the drawer blue does not paint behind system icons */}
+                <View style={[styles.modalDrawerTopSpacer, { height: drawerTopInset }]} />
+                <View style={[styles.modalDrawerPanel, { paddingBottom: drawerBottomInset }]}>
+                  {renderSidebar(true)}
+                </View>
+              </View>
             </Animated.View>
           </View>
         </Modal>
@@ -840,6 +854,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "78%",
     maxWidth: 320,
+    backgroundColor: "transparent",
+  },
+  modalDrawerColumn: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  // Transparent so the full-screen dimmed `backdrop` shows through — same
+  // tone as the rest of the overlay. A solid color here looked like a
+  // second "header" and brighter than the dimmed area.
+  modalDrawerTopSpacer: {
+    width: "100%",
+    backgroundColor: "transparent",
+  },
+  modalDrawerPanel: {
+    flex: 1,
     backgroundColor: "#1e3a8a",
   },
   backdrop: {
