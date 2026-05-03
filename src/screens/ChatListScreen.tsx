@@ -58,6 +58,8 @@ export function ChatListScreen({ session, call }: Props) {
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [revealedMessageId, setRevealedMessageId] = useState<string | null>(null);
+  /** Lifts the active message row above FlatList siblings so the reaction bar clears system bubbles. */
+  const [elevatedMessageId, setElevatedMessageId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const drawerTranslateX = useRef(new Animated.Value(-340)).current;
   const messageListRef = useRef<FlatList>(null);
@@ -482,22 +484,33 @@ export function ChatListScreen({ session, call }: Props) {
               }
 
               return (
-                <MessageBubble
-                  message={item}
-                  mine={mine}
-                  revealed={revealedMessageId === item.id}
-                  pickerBelow={index < 2}
-                  onToggleReveal={() =>
-                    setRevealedMessageId((current) => (current === item.id ? null : item.id))
-                  }
-                  onReact={(emoji) => handleReaction(item.id, emoji)}
-                  onPreviewImage={(url) => setPreviewUrl(url)}
-                  onRetry={
-                    item.status === "failed" && selectedContact
-                      ? () => session.retryMessage(item.id, selectedContact.userId)
-                      : undefined
-                  }
-                />
+                <View
+                  style={elevatedMessageId === item.id ? styles.messageRowElevated : undefined}
+                  collapsable={false}
+                >
+                  <MessageBubble
+                    message={item}
+                    mine={mine}
+                    revealed={revealedMessageId === item.id}
+                    pickerBelow={index < 2}
+                    onToggleReveal={() =>
+                      setRevealedMessageId((current) => (current === item.id ? null : item.id))
+                    }
+                    onReact={(emoji) => handleReaction(item.id, emoji)}
+                    onPreviewImage={(url) => setPreviewUrl(url)}
+                    onRetry={
+                      item.status === "failed" && selectedContact
+                        ? () => session.retryMessage(item.id, selectedContact.userId)
+                        : undefined
+                    }
+                    onReactionPickerVisibilityChange={(visible) => {
+                      setElevatedMessageId((prev) => {
+                        if (visible) return item.id;
+                        return prev === item.id ? null : prev;
+                      });
+                    }}
+                  />
+                </View>
               );
             }}
           />
@@ -657,6 +670,11 @@ const styles = StyleSheet.create({
   messageList: {
     padding: 12,
     flexGrow: 1,
+  },
+  messageRowElevated: {
+    position: "relative",
+    zIndex: 10000,
+    elevation: 10000,
   },
   systemMessageOuter: {
     alignItems: "center",

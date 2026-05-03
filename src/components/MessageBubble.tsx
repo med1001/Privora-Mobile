@@ -28,6 +28,8 @@ type Props = {
    * is not occluded by the chat header.
    */
   pickerBelow?: boolean;
+  /** Lets the list lift this row above neighbors so the picker is not covered by system rows. */
+  onReactionPickerVisibilityChange?: (visible: boolean) => void;
 };
 
 const SYSTEM_IMAGE_PREFIX = "__system_image:";
@@ -134,6 +136,7 @@ export function MessageBubble({
   onPreviewImage,
   onRetry,
   pickerBelow = false,
+  onReactionPickerVisibilityChange,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const reactions = message.reactions ?? {};
@@ -198,6 +201,10 @@ export function MessageBubble({
   };
 
   const hasReactions = reactionEntries.length > 0;
+
+  useEffect(() => {
+    onReactionPickerVisibilityChange?.(pickerOpen);
+  }, [pickerOpen, onReactionPickerVisibilityChange]);
 
   return (
     <View style={[styles.outer, mine ? styles.outerMine : styles.outerPeer]}>

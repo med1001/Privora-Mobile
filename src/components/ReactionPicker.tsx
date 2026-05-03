@@ -41,7 +41,8 @@ export function ReactionPicker({ onPick, align = "start", position = "above" }: 
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    zIndex: 50,
+    zIndex: 10001,
+    elevation: 10001,
   },
   posAbove: {
     bottom: "100%",
@@ -69,7 +70,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 6,
-    elevation: 6,
+    elevation: 12,
   },
   button: {
     paddingHorizontal: 6,
