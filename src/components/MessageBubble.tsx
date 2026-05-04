@@ -4,6 +4,7 @@ import {
   Image,
   Linking,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -229,7 +230,12 @@ export function MessageBubble({
     content = <AudioPlayer source={source} mine={mine} />;
   } else {
     content = (
-      <Text style={[styles.text, mine && styles.textMine]} selectable>
+      <Text
+        style={[styles.text, mine && styles.textMine]}
+        // Android text selection popup (Copy/Share/Select) clashes with
+        // our long-press reaction UI and visually pushes it away.
+        selectable={Platform.OS !== "android"}
+      >
         {text}
       </Text>
     );
