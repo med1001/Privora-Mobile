@@ -1,7 +1,9 @@
 import { ReactElement, useEffect, useRef, useState } from "react";
 import {
+  Dimensions,
   Image,
   Linking,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -10,7 +12,11 @@ import {
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
-import { ReactionPicker } from "./ReactionPicker";
+import {
+  REACTION_PICKER_BAR_HEIGHT,
+  REACTION_PICKER_BAR_WIDTH_EST,
+  ReactionPicker,
+} from "./ReactionPicker";
 import { ChatMessage } from "../types/chat";
 import { buildAssetUrl } from "../services/api";
 
@@ -28,13 +34,48 @@ type Props = {
    * is not occluded by the chat header.
    */
   pickerBelow?: boolean;
-  /** Lets the list lift this row above neighbors so the picker is not covered by system rows. */
-  onReactionPickerVisibilityChange?: (visible: boolean) => void;
 };
 
 const SYSTEM_IMAGE_PREFIX = "__system_image:";
 const SYSTEM_FILE_PREFIX = "__system_file:";
 const SYSTEM_AUDIO_PREFIX = "__system_audio:";
+
+const PICKER_GAP = 8;
+
+function computeModalPickerFrame(
+  rect: { x: number; y: number; width: number; height: number },
+  mine: boolean,
+  preferBelow: boolean,
+) {
+  const { width: screenW, height: screenH } = Dimensions.get("window");
+  const barH = REACTION_PICKER_BAR_HEIGHT;
+  const barW = REACTION_PICKER_BAR_WIDTH_EST;
+
+  const aboveTop = rect.y - barH - PICKER_GAP;
+  const belowTop = rect.y + rect.height + PICKER_GAP;
+  let top = preferBelow ? belowTop : aboveTop;
+  const overflowTop = top < PICKER_GAP;
+  const overflowBottom = top + barH > screenH - PICKER_GAP;
+  if (!preferBelow && overflowTop) top = belowTop;
+  if (preferBelow && overflowBottom) top = aboveTop;
+  if (top < PICKER_GAP) top = PICKER_GAP;
+  if (top + barH > screenH - PICKER_GAP) top = Math.max(PICKER_GAP, screenH - PICKER_GAP - barH);
+
+  const frame: { top: number; left?: number; right?: number } = { top };
+  const margin = 8;
+
+  if (mine) {
+    frame.right = Math.max(margin, screenW - rect.x - rect.width);
+  } else {
+    const desiredLeft = rect.x;
+    frame.left = Math.min(
+      Math.max(margin, desiredLeft),
+      Math.max(margin, screenW - margin - barW),
+    );
+  }
+
+  return frame;
+}
 
 function formatTimestamp(timestamp: string | null | undefined) {
   if (!timestamp) return "";
@@ -136,9 +177,15 @@ export function MessageBubble({
   onPreviewImage,
   onRetry,
   pickerBelow = false,
-  onReactionPickerVisibilityChange,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerFrame, setPickerFrame] = useState<ReturnType<typeof computeModalPickerFrame> | null>(null);
+  const bubbleClusterRef = useRef<View>(null);
+
+  const closeReactionPicker = () => {
+    setPickerOpen(false);
+    setPickerFrame(null);
+  };
   const reactions = message.reactions ?? {};
   const reactionEntries = Object.entries(reactions);
   const text = message.text;
@@ -189,14 +236,16 @@ export function MessageBubble({
   }
 
   const handleLongPress = () => {
-    onReactionPickerVisibilityChange?.(true);
-    setPickerOpen(true);
+    bubbleClusterRef.current?.measureInWindow((x, y, w, h) => {
+      const frame = computeModalPickerFrame({ x, y, width: w, height: h }, mine, pickerBelow);
+      setPickerFrame(frame);
+      setPickerOpen(true);
+    });
   };
 
   const handlePress = () => {
     if (pickerOpen) {
-      onReactionPickerVisibilityChange?.(false);
-      setPickerOpen(false);
+      closeReactionPicker();
       return;
     }
     onToggleReveal();
@@ -208,7 +257,11 @@ export function MessageBubble({
     <View style={[styles.outer, mine ? styles.outerMine : styles.outerPeer]}>
       {/* Cluster keeps bubble width = message only; picker is absolute so it
           never stretches the blue/white bubble to full row width. */}
-      <View style={[styles.bubbleCluster, mine ? styles.bubbleClusterMine : styles.bubbleClusterPeer]}>
+      <View
+        ref={bubbleClusterRef}
+        collapsable={false}
+        style={[styles.bubbleCluster, mine ? styles.bubbleClusterMine : styles.bubbleClusterPeer]}
+      >
         <Pressable
           style={[
             styles.bubble,
@@ -238,19 +291,34 @@ export function MessageBubble({
             </View>
           )}
         </Pressable>
-
-        {pickerOpen && (
-          <ReactionPicker
-            align={mine ? "end" : "start"}
-            position={pickerBelow ? "below" : "above"}
-            onPick={(emoji) => {
-              onReactionPickerVisibilityChange?.(false);
-              setPickerOpen(false);
-              onReact(emoji);
-            }}
-          />
-        )}
       </View>
+
+      <Modal
+        visible={pickerOpen}
+        transparent
+        animationType="none"
+        onRequestClose={closeReactionPicker}
+        statusBarTranslucent
+      >
+        <View style={styles.reactionModalRoot} pointerEvents="box-none">
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel="Dismiss reactions"
+            onPress={closeReactionPicker}
+          />
+          {pickerFrame ? (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <ReactionPicker
+                floatingFrame={pickerFrame}
+                onPick={(emoji) => {
+                  closeReactionPicker();
+                  onReact(emoji);
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
+      </Modal>
 
       {revealed && (
         <Text
@@ -436,5 +504,8 @@ const styles = StyleSheet.create({
     color: "#dc2626",
     fontSize: 11,
     fontWeight: "600",
+  },
+  reactionModalRoot: {
+    flex: 1,
   },
 });

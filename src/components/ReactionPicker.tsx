@@ -1,27 +1,37 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 export const REACTION_EMOJIS = ["\uD83D\uDC4D", "\u2764\uFE0F", "\uD83D\uDE02", "\uD83D\uDE2E", "\uD83D\uDE22", "\uD83D\uDD25"];
+
+/** Approximate height of the pill bar (padding + emoji); used for window positioning. */
+export const REACTION_PICKER_BAR_HEIGHT = 48;
+export const REACTION_PICKER_BAR_WIDTH_EST = 260;
 
 type Props = {
   onPick: (emoji: string) => void;
   align?: "start" | "end";
   position?: "above" | "below";
+  /**
+   * When set, the bar is placed with window-absolute coordinates (e.g. inside a Modal).
+   * In that case `align` and `position` are ignored.
+   */
+  floatingFrame?: Pick<ViewStyle, "top" | "left" | "right">;
 };
 
 /**
- * Emoji bar anchored to a relatively-positioned parent (the bubble cluster).
- * Always absolutely positioned so it never stretches the chat bubble width.
+ * Emoji bar anchored to a relatively-positioned parent (the bubble cluster),
+ * or to the screen when `floatingFrame` is passed (Modal overlay).
  */
-export function ReactionPicker({ onPick, align = "start", position = "above" }: Props) {
-  return (
-    <View
-      pointerEvents="box-none"
-      style={[
+export function ReactionPicker({ onPick, align = "start", position = "above", floatingFrame }: Props) {
+  const anchoredStyle: StyleProp<ViewStyle> = floatingFrame
+    ? ([styles.wrapper, floatingFrame] as StyleProp<ViewStyle>)
+    : [
         styles.wrapper,
         position === "above" ? styles.posAbove : styles.posBelow,
         align === "end" ? styles.alignEnd : styles.alignStart,
-      ]}
-    >
+      ];
+
+  return (
+    <View pointerEvents="box-none" style={anchoredStyle}>
       <View style={styles.bar}>
         {REACTION_EMOJIS.map((emoji) => (
           <Pressable
@@ -41,8 +51,8 @@ export function ReactionPicker({ onPick, align = "start", position = "above" }: 
 const styles = StyleSheet.create({
   wrapper: {
     position: "absolute",
-    zIndex: 10001,
-    elevation: 10001,
+    zIndex: 2,
+    elevation: 12,
   },
   posAbove: {
     bottom: "100%",
