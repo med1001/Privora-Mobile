@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Privora",
-    "slug": "privora-mobile",
+    "slug": "privora",
     "scheme": "privora",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -57,7 +57,10 @@
       "firebaseProjectId": "privora-61d4d",
       "firebaseStorageBucket": "privora-61d4d.firebasestorage.app",
       "firebaseMessagingSenderId": "118761355969",
-      "firebaseAppId": "1:118761355969:web:210c4c457d7a0ed73e3240"
+      "firebaseAppId": "1:118761355969:web:210c4c457d7a0ed73e3240",
+      "eas": {
+        "projectId": "91079841-4593-4fff-a720-4e492c6abedc"
+      }
     },
     "plugins": [
       "./plugins/withFirebaseMessagingManifestFix",
@@ -89,6 +92,7 @@
           }
         }
       ]
-    ]
+    ],
+    "owner": "bnmssamohameds-team"
   }
 }
