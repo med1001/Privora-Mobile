@@ -11,6 +11,8 @@ expo-env.d.ts
 
 # Native
 .kotlin/
+.gradle/
+.android/
 *.orig.*
 *.jks
 *.p8
@@ -43,6 +45,7 @@ yarn-error.*
 firebase-credentials*.json
 google-services.json
 GoogleService-Info.plist
+!/google-services.json
 
 # typescript
 *.tsbuildinfo

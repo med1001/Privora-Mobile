@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "118761355969",
+    "project_id": "privora-61d4d",
+    "storage_bucket": "privora-61d4d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118761355969:android:cc5562664471cd7e3e3240",
+        "android_client_info": {
+          "package_name": "com.anonymous.PrivoraMobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLxVdna4rSN7Qy9wds_KQA56y1B6K1yWY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118761355969:android:550f97634c629f113e3240",
+        "android_client_info": {
+          "package_name": "com.privora.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLxVdna4rSN7Qy9wds_KQA56y1B6K1yWY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118761355969:android:275d6723af0ac57c3e3240",
+        "android_client_info": {
+          "package_name": "com.privora.mobile.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLxVdna4rSN7Qy9wds_KQA56y1B6K1yWY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

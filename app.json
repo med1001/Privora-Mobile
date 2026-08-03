@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "Privora-Mobile",
-    "slug": "Privora-Mobile",
+    "name": "Privora",
+    "slug": "privora-mobile",
+    "scheme": "privora",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -44,14 +45,14 @@
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.PrivoraMobile",
-      "usesCleartextTraffic": true
+      "package": "com.privora.mobile",
+      "googleServicesFile": "./google-services.json",
+      "usesCleartextTraffic": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "registerUrl": "https://privora-61d4d.firebaseapp.com/register",
       "firebaseAuthDomain": "privora-61d4d.firebaseapp.com",
       "firebaseProjectId": "privora-61d4d",
       "firebaseStorageBucket": "privora-61d4d.firebasestorage.app",
@@ -59,6 +60,7 @@
       "firebaseAppId": "1:118761355969:web:210c4c457d7a0ed73e3240"
     },
     "plugins": [
+      "./plugins/withFirebaseMessagingManifestFix",
       "expo-secure-store",
       "@react-native-firebase/app",
       [

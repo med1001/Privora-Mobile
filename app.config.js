@@ -60,27 +60,52 @@ function buildApiUrls() {
 
 module.exports = ({ config }) => {
   const { apiBaseUrl, wsUrl } = buildApiUrls();
+  const isProduction =
+    process.env.APP_VARIANT === "production" || process.env.EAS_BUILD_PROFILE === "production";
+  const applicationId = isProduction ? "com.privora.mobile" : "com.privora.mobile.debug";
 
   // Only declare googleServicesFile when the JSON is actually present, so
   // the build does not fail before the developer downloads it. See
   // docs/push-notifications-setup.md for setup steps.
   const googleServicesPath = path.join(__dirname, "google-services.json");
   const hasGoogleServicesFile = fs.existsSync(googleServicesPath);
+  let googleServicesMatchesPackage = false;
+  if (hasGoogleServicesFile) {
+    try {
+      const googleServices = JSON.parse(fs.readFileSync(googleServicesPath, "utf8"));
+      googleServicesMatchesPackage = (googleServices.client ?? []).some(
+        (client) => client?.client_info?.android_client_info?.package_name === applicationId,
+      );
+    } catch {
+      googleServicesMatchesPackage = false;
+    }
+  }
 
   const android = { ...(config.android ?? {}) };
-  if (hasGoogleServicesFile) {
+  android.package = applicationId;
+  android.usesCleartextTraffic = apiBaseUrl.startsWith("http://");
+  if (googleServicesMatchesPackage) {
     android.googleServicesFile = "./google-services.json";
   } else {
     delete android.googleServicesFile;
   }
 
+  if (process.env.EAS_BUILD_PROFILE === "production" && !googleServicesMatchesPackage) {
+    throw new Error(
+      "Production Android builds require google-services.json registered for com.privora.mobile.",
+    );
+  }
+
   return {
     ...config,
+    name: isProduction ? "Privora" : "Privora Dev",
+    scheme: isProduction ? "privora" : "privora-dev",
     android,
     extra: {
       ...(config.extra ?? {}),
       apiBaseUrl,
       wsUrl,
+      appVariant: isProduction ? "production" : "development",
     },
   };
 };
