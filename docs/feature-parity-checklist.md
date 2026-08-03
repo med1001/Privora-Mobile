@@ -7,9 +7,9 @@ and the mobile client (`Privora-Mobile`).
 - Email/password sign-in via Firebase ✅
 - Persisted auth (AsyncStorage) and silent token refresh ✅
 - Email-verification gate on login ✅
-- "Register here" external link to web register flow ✅
+- In-app registration with display name and verification email ✅
+- In-app forgot-password email flow ✅
 - Logout from profile menu ✅
-- In-app registration / forgot-password flows ❌ (web also delegates register to a dedicated page; the link approach matches)
 
 ## WebSocket lifecycle
 - `login` + `signal_session_claim` on open ✅
@@ -72,5 +72,7 @@ and the mobile client (`Privora-Mobile`).
 ## UI / Theme
 - Animated drawer for the contact list on phones ✅
 - Profile menu (Settings / Logout) ✅
+- Settings profile loading and profile-photo upload ✅
+- Contact-support and issue-report forms ✅
 - WS status pill in header when reconnecting ✅
 - Dark mode ❌ (web does not have it either)

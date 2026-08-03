@@ -1,10 +1,13 @@
 # Privora Mobile (React Native)
 
-This project is the mobile starter app for Privora chat, aligned with the existing web contract:
+Privora Mobile is the native React Native client for Privora, aligned with the
+web application and backend contracts:
 
 - Firebase Authentication
-- REST: `/search-users`
-- WebSocket: `/ws` with JSON message types (`login`, `message`, `history`, `contacts`, `presence`)
+- REST APIs for search, uploads, profile settings, support, push registration,
+  and WebRTC configuration
+- WebSocket chat, presence, reactions, history, and WebRTC signaling
+- Android FCM + Notifee incoming-call notifications
 
 ## 1) Install dependencies
 
@@ -49,14 +52,19 @@ Then press:
 
 ## Current scope
 
-- Firebase email/password login
-- Chat list + user search via REST
-- Chat room + send/receive messages via WebSocket
-- Presence/contact/history payload handling
+- Firebase login, registration, verification gate, and password reset
+- Chat, presence, unread counts, reactions, and retryable sends
+- Image/document attachments and voice messages
+- Audio calls with WebRTC, TURN support, mute/speaker controls, and call history
+- Incoming-call push notifications with Answer/Decline actions
+- Profile photo, contact-support, and issue-report settings
+- Public privacy/deletion information and authenticated account deletion
 
-## Next implementation steps
+## Production work still required
 
-1. Add register/forgot password screens.
-2. Add unread counters + notifications.
-3. Add attachment upload endpoint integration.
-4. Add calling layer (WebRTC + push + incoming call UI).
+See [the Android release checklist](docs/android-release.md) for Firebase,
+signing, EAS Build and Play Console preparation.
+
+1. Add automated tests and CI checks.
+2. Integrate Android ConnectionService (and iOS CallKit when iOS work starts).
+3. Persist backend FCM tokens and call state in shared storage.

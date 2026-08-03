@@ -44,8 +44,8 @@ and enable it in the Google Cloud console.
 Firebase Console → Project Settings → "Your apps" → "Add app" → Android.
 
 - **Android package name**: must match `app.json > expo.android.package`.
-  Today it is `com.anonymous.PrivoraMobile` - either reuse it or update
-  both sides.
+  The release application ID is `com.privora.mobile`. Register this exact ID
+  in Firebase and keep it aligned with the Expo configuration.
 - SHA fingerprints are not required for FCM, only for Firebase Auth on
   Google Sign-In flows. You can leave them blank for now.
 
