@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
 import { LoginScreen } from "../screens/LoginScreen";
+import { RegisterScreen } from "../screens/RegisterScreen";
 import { ChatListScreen } from "../screens/ChatListScreen";
 import { useChatSession } from "../hooks/useChatSession";
 import { useWebRTCCall } from "../hooks/useWebRTCCall";
@@ -16,6 +17,7 @@ import {
 
 export type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
   ChatList: undefined;
 };
 
@@ -119,11 +121,18 @@ export function RootNavigator() {
     <>
       <Stack.Navigator>
         {!user ? (
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ title: "Privora Login", headerShown: false }}
-          />
+          <Stack.Group screenOptions={{ headerShown: false }}>
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ title: "Privora Login" }}
+            />
+            <Stack.Screen
+              name="Register"
+              component={RegisterScreen}
+              options={{ title: "Create account" }}
+            />
+          </Stack.Group>
         ) : (
           <Stack.Screen
             name="ChatList"

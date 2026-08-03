@@ -13,25 +13,23 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Constants from "expo-constants";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
+import type { RootStackParamList } from "../navigation/RootNavigator";
 
 const LOGO = require("../../assets/logo.png");
 
-function getExtraRegisterUrl(): string | undefined {
-  const extra = Constants.expoConfig?.extra as { registerUrl?: string } | undefined;
-  const url = extra?.registerUrl?.trim();
-  return url || undefined;
-}
+type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 
-export function LoginScreen() {
-  const { login } = useAuth();
+export function LoginScreen({ navigation }: Props) {
+  const { login, resetPassword } = useAuth();
   const insets = useSafeAreaInsets();
-  const registerUrl = getExtraRegisterUrl();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const phrases = [
     "No cookies.",
     "No ads.",
@@ -72,6 +70,7 @@ export function LoginScreen() {
     if (!canSubmit || busy) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await login(email, password);
     } catch (err) {
@@ -81,9 +80,24 @@ export function LoginScreen() {
     }
   };
 
-  const openRegister = () => {
-    if (!registerUrl) return;
-    void Linking.openURL(registerUrl);
+  const onForgotPassword = async () => {
+    const targetEmail = email.trim();
+    if (!targetEmail || resettingPassword) {
+      setError("Enter your email address first.");
+      return;
+    }
+
+    setResettingPassword(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await resetPassword(targetEmail);
+      setNotice("Password reset email sent. Check your inbox.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send password reset email.");
+    } finally {
+      setResettingPassword(false);
+    }
   };
 
   return (
@@ -135,6 +149,18 @@ export function LoginScreen() {
             />
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
+            {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+            <Pressable
+              onPress={() => void onForgotPassword()}
+              disabled={resettingPassword || busy}
+              hitSlop={8}
+              style={styles.forgotPasswordButton}
+            >
+              <Text style={styles.forgotPasswordText}>
+                {resettingPassword ? "Sending reset email..." : "Forgot password?"}
+              </Text>
+            </Pressable>
 
             <Pressable
               style={[styles.button, (!canSubmit || busy) && styles.buttonDisabled]}
@@ -150,13 +176,9 @@ export function LoginScreen() {
 
             <View style={styles.registerRow}>
               <Text style={styles.registerMuted}>Don't have an account? </Text>
-              {registerUrl ? (
-                <Pressable onPress={openRegister} hitSlop={8}>
-                  <Text style={styles.registerLink}>Register here</Text>
-                </Pressable>
-              ) : (
-                <Text style={styles.registerLinkMuted}>Register here</Text>
-              )}
+              <Pressable onPress={() => navigation.navigate("Register")} hitSlop={8}>
+                <Text style={styles.registerLink}>Register here</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -273,6 +295,19 @@ const styles = StyleSheet.create({
     color: "#ef4444",
     fontSize: 14,
   },
+  notice: {
+    color: "#15803d",
+    fontSize: 14,
+  },
+  forgotPasswordButton: {
+    alignSelf: "flex-end",
+    marginTop: -6,
+  },
+  forgotPasswordText: {
+    color: "#2563eb",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   registerRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -287,11 +322,6 @@ const styles = StyleSheet.create({
   },
   registerLink: {
     color: "#3b82f6",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  registerLinkMuted: {
-    color: "#93c5fd",
     fontSize: 14,
     fontWeight: "500",
   },
