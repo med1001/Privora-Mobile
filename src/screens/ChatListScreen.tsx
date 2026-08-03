@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +28,8 @@ import { MessageBubble } from "../components/MessageBubble";
 import { AttachmentMenu } from "../components/AttachmentMenu";
 import { VoiceRecorder } from "../components/VoiceRecorder";
 import { ImagePreviewModal } from "../components/ImagePreviewModal";
+import { SettingsModal } from "../components/SettingsModal";
+import { buildAssetUrl, type SettingsProfile } from "../services/api";
 
 type CallControls = {
   callState: CallState;
@@ -57,6 +60,8 @@ export function ChatListScreen({ session, call }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsProfile, setSettingsProfile] = useState<SettingsProfile | null>(null);
   const [revealedMessageId, setRevealedMessageId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const drawerTranslateX = useRef(new Animated.Value(-340)).current;
@@ -73,7 +78,8 @@ export function ChatListScreen({ session, call }: Props) {
   const contacts = useMemo(() => session.contacts, [session.contacts]);
   const selectedContact = contacts.find((item) => item.userId === session.selectedChatUserId) ?? null;
   const messages = selectedContact ? session.selectedMessages : [];
-  const profileLabelSource = (user?.displayName || user?.email || "User").trim();
+  const profileLabelSource = (settingsProfile?.displayName || user?.displayName || user?.email || "User").trim();
+  const profilePhotoUrl = settingsProfile?.photoURL || user?.photoURL || "";
   const localUserId = user?.email || user?.uid || "";
   const initials = profileLabelSource
     .split(/\s+/)
@@ -417,9 +423,11 @@ export function ChatListScreen({ session, call }: Props) {
               style={styles.profileCircle}
               accessibilityLabel="Profile menu"
             >
-              <Text style={styles.profileLetter}>
-                {initials}
-              </Text>
+              {profilePhotoUrl ? (
+                <Image source={{ uri: buildAssetUrl(profilePhotoUrl) }} style={styles.profileImage} />
+              ) : (
+                <Text style={styles.profileLetter}>{initials}</Text>
+              )}
             </Pressable>
             {profileMenuOpen && (
               <View style={styles.profileMenu}>
@@ -427,6 +435,7 @@ export function ChatListScreen({ session, call }: Props) {
                   style={styles.profileMenuItem}
                   onPress={() => {
                     setProfileMenuOpen(false);
+                    setSettingsOpen(true);
                   }}
                 >
                   <Text style={styles.profileMenuText}>Settings</Text>
@@ -556,6 +565,11 @@ export function ChatListScreen({ session, call }: Props) {
       )}
 
       <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      <SettingsModal
+        visible={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onProfileUpdated={setSettingsProfile}
+      />
     </SafeAreaView>
   );
 }
@@ -891,6 +905,11 @@ const styles = StyleSheet.create({
   profileLetter: {
     color: "#111827",
     fontWeight: "700",
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 999,
   },
   profileMenu: {
     position: "absolute",

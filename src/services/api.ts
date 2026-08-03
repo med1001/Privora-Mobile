@@ -16,6 +16,22 @@ export type UploadResponse = {
   type?: string;
 };
 
+export type SettingsProfile = {
+  userId: string;
+  displayName: string;
+  photoURL?: string | null;
+};
+
+type SettingsPhotoResponse = {
+  message: string;
+  user: SettingsProfile;
+};
+
+type SupportRequestResponse = {
+  message: string;
+  requestId: number;
+};
+
 async function apiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const url = `${config.apiBaseUrl}${path}`;
   let response: Response;
@@ -67,6 +83,63 @@ export function unregisterPushToken(token: string, deviceToken: string) {
   return apiFetch<{ ok: boolean }>("/api/push/unregister", token, {
     method: "POST",
     body: JSON.stringify({ token: deviceToken }),
+  });
+}
+
+export function fetchSettingsProfile(token: string) {
+  return apiFetch<SettingsProfile>("/api/settings/me", token, {
+    method: "GET",
+  });
+}
+
+export async function uploadProfilePhoto(asset: UploadAsset, token: string): Promise<SettingsPhotoResponse> {
+  const formData = new FormData();
+  formData.append("file", {
+    uri: asset.uri,
+    name: asset.name,
+    type: asset.mimeType,
+  } as unknown as Blob);
+
+  const response = await fetch(`${config.apiBaseUrl}/api/settings/profile-photo`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  const data = (await response.json().catch(() => ({}))) as Partial<SettingsPhotoResponse> & {
+    detail?: string;
+  };
+  if (!response.ok || !data.user) {
+    throw new Error(data.detail || "Could not update profile photo.");
+  }
+  return data as SettingsPhotoResponse;
+}
+
+function submitSupportRequest(
+  endpoint: "/api/settings/contact" | "/api/settings/report-issue",
+  subject: string,
+  message: string,
+  token: string,
+) {
+  return apiFetch<SupportRequestResponse>(endpoint, token, {
+    method: "POST",
+    body: JSON.stringify({ subject: subject.trim(), message: message.trim() }),
+  });
+}
+
+export function contactSupport(subject: string, message: string, token: string) {
+  return submitSupportRequest("/api/settings/contact", subject, message, token);
+}
+
+export function reportIssue(subject: string, message: string, token: string) {
+  return submitSupportRequest("/api/settings/report-issue", subject, message, token);
+}
+
+export function deletePrivoraAccount(token: string) {
+  return apiFetch<{ message: string }>("/api/settings/account", token, {
+    method: "DELETE",
+    body: JSON.stringify({ confirmation: "DELETE" }),
   });
 }
 
