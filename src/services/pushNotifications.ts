@@ -4,6 +4,9 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import messaging from "@react-native-firebase/messaging";
 import { registerPushToken, unregisterPushToken } from "./api";
+import { setPushRecipient, cacheIdToken, normalizeRecipient } from "./pushIdentity";
+import { clearPendingCallAction } from "./incomingCallActions";
+import { cancelAllIncomingCalls } from "./incomingCallNotification";
 
 /**
  * Push registration for incoming-call notifications.
@@ -25,8 +28,82 @@ import { registerPushToken, unregisterPushToken } from "./api";
  * `docs/push-notifications-setup.md`.
  */
 
-let cachedDeviceToken: string | null = null;
-let registeredOnBackend = false;
+type PushAccount = { uid: string; email: string | null; getIdToken: () => Promise<string> };
+type Session = { account: PushAccount; deviceToken?: string; registered: boolean; ready: Promise<void> };
+let active: Session | null = null;
+let mutations: Promise<unknown> = Promise.resolve();
+export const PUSH_TIMEOUT_MS = 8_000;
+
+function enqueue<T>(operation: () => Promise<T>): Promise<T> {
+  const result = mutations.then(operation);
+  mutations = result.catch(() => undefined);
+  return result;
+}
+
+async function bounded<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation(controller.signal),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("Push operation timed out"));
+        }, PUSH_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Establish identity before exposing the authenticated UI. No network wait. */
+export async function startPushSession(account: PushAccount): Promise<void> {
+  if (active?.account.uid === account.uid) return active.ready;
+  const previous = active;
+  const recipient = normalizeRecipient(account.email);
+  const ready = setPushRecipient(recipient || null);
+  const session: Session = { account, registered: false, ready };
+  active = session;
+  if (previous) {
+    // Preserve a cold-start Answer for the same restored user, but never for
+    // an in-process account switch. Network cleanup precedes B registration.
+    void enqueue(() => removeRegistration(previous));
+    session.ready = ready.then(async () => {
+      await Promise.all([clearPendingCallAction(), cancelAllIncomingCalls()]);
+    });
+  }
+  await session.ready;
+}
+
+async function removeRegistration(session: Session): Promise<void> {
+  try {
+    await bounded(async (signal) => {
+      const deviceToken = session.deviceToken ?? await getDeviceTokenAsync();
+      if (!deviceToken || signal.aborted) return;
+      const token = await session.account.getIdToken();
+      if (signal.aborted) return;
+      await unregisterPushToken(token, deviceToken, signal);
+    });
+  } catch {
+    // Offline/revoked credentials: local recipient filtering remains active.
+    console.warn("[push] unregister unavailable; local session cleared");
+  }
+}
+
+/** Invalidate immediately; finish best-effort unregister before Firebase signOut. */
+export function stopPushSession(): Promise<void> {
+  const previous = active;
+  active = null;
+  const cleanup = Promise.allSettled([
+    setPushRecipient(null), clearPendingCallAction(), cancelAllIncomingCalls(),
+  ]);
+  return enqueue(async () => {
+    await cleanup;
+    if (previous) await removeRegistration(previous);
+  });
+}
 
 async function requestPermissionsAsync(): Promise<boolean> {
   if (!Device.isDevice && Platform.OS !== "ios") {
@@ -90,47 +167,35 @@ async function getDeviceTokenAsync(): Promise<string | null> {
   return null;
 }
 
-/**
- * Idempotent: safe to call from a `useEffect` on every login. Returns
- * true when a token was successfully registered with the backend.
- */
-export async function registerPushNotifications(getIdToken: () => Promise<string>): Promise<boolean> {
-  const granted = await requestPermissionsAsync();
-  if (!granted) {
-    return false;
-  }
-
-  const deviceToken = await getDeviceTokenAsync();
-  if (!deviceToken) {
-    return false;
-  }
-
-  if (cachedDeviceToken === deviceToken && registeredOnBackend) {
-    return true;
-  }
-
-  try {
-    const idToken = await getIdToken();
-    await registerPushToken(idToken, deviceToken, Platform.OS === "ios" ? "ios" : "android");
-    cachedDeviceToken = deviceToken;
-    registeredOnBackend = true;
-    return true;
-  } catch (err) {
-    console.warn("[push] failed to register token with backend", err);
-    return false;
-  }
-}
-
-/** Tell the backend to forget this device's token (call on logout). */
-export async function unregisterPushNotifications(getIdToken: () => Promise<string>): Promise<void> {
-  const token = cachedDeviceToken;
-  cachedDeviceToken = null;
-  registeredOnBackend = false;
-  if (!token) return;
-  try {
-    const idToken = await getIdToken();
-    await unregisterPushToken(idToken, token);
-  } catch (err) {
-    console.warn("[push] failed to unregister token", err);
-  }
+/** Retry on login/foreground. Cache belongs to this exact authenticated session. */
+export function registerPushNotifications(): Promise<boolean> {
+  const session = active;
+  if (!session) return Promise.resolve(false);
+  return enqueue(async () => {
+    if (active !== session) return false;
+    try {
+      return await bounded(async (signal) => {
+        await session.ready;
+        if (!normalizeRecipient(session.account.email)) return false;
+        if (!(await requestPermissionsAsync())) return false;
+        if (active !== session || signal.aborted) return false;
+        const deviceToken = await getDeviceTokenAsync();
+        if (!deviceToken || active !== session || signal.aborted) return false;
+        if (session.deviceToken === deviceToken && session.registered) return true;
+        const idToken = await session.account.getIdToken();
+        if (active !== session || signal.aborted) return false;
+        await cacheIdToken(idToken, session.account.email!);
+        if (active !== session || signal.aborted) return false;
+        // Remember an attempted registration even if the response is lost.
+        session.deviceToken = deviceToken;
+        await registerPushToken(idToken, deviceToken, Platform.OS === "ios" ? "ios" : "android", signal);
+        if (active !== session || signal.aborted) return false;
+        session.registered = true;
+        return true;
+      });
+    } catch {
+      console.warn("[push] registration unavailable; will retry on foreground/login");
+      return false;
+    }
+  });
 }

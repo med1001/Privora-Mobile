@@ -2,9 +2,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DeviceEventEmitter } from "react-native";
 import Constants from "expo-constants";
 import type { IncomingCallData } from "./incomingCallNotification";
+import { isCurrentPushRecipient, readCachedIdToken } from "./pushIdentity";
 
 const PENDING_KEY = "@privora/pendingCallAction";
-const TOKEN_CACHE_KEY = "@privora/cachedIdToken";
 export const INCOMING_CALL_EVENT = "privora:incoming-call-action";
 
 /** Emitted in-app when an action button (Answer / Decline) is tapped. */
@@ -25,6 +25,7 @@ type ActionInput = {
  * already-running app can react immediately.
  */
 export async function handleIncomingCallAction({ kind, payload }: ActionInput): Promise<void> {
+  if (!(await isCurrentPushRecipient(payload.toUserId))) return;
   const action: PendingCallAction = { kind, payload, ts: Date.now() };
 
   try {
@@ -34,6 +35,7 @@ export async function handleIncomingCallAction({ kind, payload }: ActionInput): 
   }
 
   try {
+    if (!(await isCurrentPushRecipient(payload.toUserId))) return;
     DeviceEventEmitter.emit(INCOMING_CALL_EVENT, action);
   } catch {
     // best-effort
@@ -43,7 +45,7 @@ export async function handleIncomingCallAction({ kind, payload }: ActionInput): 
     await sendDeclineToBackend(payload).catch(() => {
       // 45 s server-side timeout will clean up if the HTTP call fails.
     });
-    await clearPendingCallAction();
+    await clearPendingCallAction(payload.callId);
   }
 }
 
@@ -55,44 +57,23 @@ export async function readPendingCallAction(): Promise<PendingCallAction | null>
     if (!parsed || !parsed.kind || !parsed.payload?.callId) return null;
     // Stale actions (older than the call ringing timeout) are not actionable.
     if (Date.now() - (parsed.ts || 0) > 60_000) {
-      await clearPendingCallAction();
+      await clearPendingCallAction(parsed.payload.callId);
       return null;
     }
+    if (!(await isCurrentPushRecipient(parsed.payload.toUserId))) return null;
     return parsed;
   } catch {
     return null;
   }
 }
 
-export async function clearPendingCallAction(): Promise<void> {
+export async function clearPendingCallAction(callId?: string): Promise<void> {
   try {
+    if (callId) {
+      const raw = await AsyncStorage.getItem(PENDING_KEY);
+      if (!raw || JSON.parse(raw)?.payload?.callId !== callId) return;
+    }
     await AsyncStorage.removeItem(PENDING_KEY);
-  } catch {
-    // ignore
-  }
-}
-
-/** Cache the most recent Firebase ID token for use from the background JS bundle. */
-export async function cacheIdToken(token: string): Promise<void> {
-  if (!token) return;
-  try {
-    await AsyncStorage.setItem(TOKEN_CACHE_KEY, token);
-  } catch {
-    // ignore
-  }
-}
-
-export async function readCachedIdToken(): Promise<string | null> {
-  try {
-    return await AsyncStorage.getItem(TOKEN_CACHE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export async function clearCachedIdToken(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(TOKEN_CACHE_KEY);
   } catch {
     // ignore
   }
@@ -104,7 +85,7 @@ function readApiBaseUrl(): string {
 }
 
 async function sendDeclineToBackend(payload: IncomingCallData): Promise<void> {
-  const token = await readCachedIdToken();
+  const token = await readCachedIdToken(payload.toUserId);
   if (!token) return;
 
   const url = `${readApiBaseUrl()}/api/calls/${encodeURIComponent(payload.callId)}/reject`;
