@@ -9,6 +9,8 @@ import notifee, {
 import { Platform } from "react-native";
 import { handleIncomingCallAction } from "./incomingCallActions";
 
+import { isCurrentPushRecipient } from "./pushIdentity";
+
 export const INCOMING_CALL_CHANNEL_ID = "incoming_call";
 export const INCOMING_CALL_CATEGORY_ID = "privora.incoming_call";
 export const NOTIFEE_ACTION_ACCEPT = "accept";
@@ -16,6 +18,7 @@ export const NOTIFEE_ACTION_DECLINE = "decline";
 
 export type IncomingCallData = {
   callId: string;
+  toUserId: string;
   fromUserId: string;
   fromDisplayName: string;
 };
@@ -51,14 +54,17 @@ function notificationIdFor(callId: string): string {
  * buttons and a full-screen intent so it can take over the lock screen on
  * Android. Safe to call from the background message handler.
  */
-export async function displayIncomingCall(data: IncomingCallData): Promise<void> {
+export async function displayIncomingCall(data: IncomingCallData): Promise<boolean> {
+  if (!(await isCurrentPushRecipient(data.toUserId))) return false;
   await ensureIncomingCallChannel();
+  if (!(await isCurrentPushRecipient(data.toUserId))) return false;
 
   const title = "Incoming call";
-  const body = `${data.fromDisplayName || data.fromUserId} is calling…`;
+  const body = `${data.fromDisplayName || data.fromUserId} is callingâ€¦`;
   const dataPayload: Record<string, string> = {
     type: "incoming_call",
     callId: data.callId,
+    toUserId: data.toUserId,
     fromUserId: data.fromUserId,
     fromDisplayName: data.fromDisplayName || "",
   };
@@ -115,6 +121,11 @@ export async function displayIncomingCall(data: IncomingCallData): Promise<void>
       critical: true,
     },
   });
+  if (!(await isCurrentPushRecipient(data.toUserId))) {
+    await cancelIncomingCall(data.callId);
+    return false;
+  }
+  return true;
 }
 
 /** Cancel the call notification by callId. Safe to call multiple times. */
@@ -171,8 +182,9 @@ function payloadFromEvent(event: Event): IncomingCallData | null {
   const callId = typeof data.callId === "string" ? data.callId : "";
   const fromUserId = typeof data.fromUserId === "string" ? data.fromUserId : "";
   const fromDisplayName = typeof data.fromDisplayName === "string" ? data.fromDisplayName : "";
-  if (!callId || !fromUserId) return null;
-  return { callId, fromUserId, fromDisplayName: fromDisplayName || fromUserId };
+  const toUserId = typeof data.toUserId === "string" ? data.toUserId : "";
+  if (!callId || !fromUserId || !toUserId) return null;
+  return { callId, toUserId, fromUserId, fromDisplayName: fromDisplayName || fromUserId };
 }
 
 /**
@@ -186,6 +198,10 @@ export async function handleIncomingCallEvent(event: Event): Promise<boolean> {
 
   const payload = payloadFromEvent(event);
   if (!payload) return false;
+  if (!(await isCurrentPushRecipient(payload.toUserId))) {
+    await cancelIncomingCall(payload.callId);
+    return false;
+  }
 
   const actionId = event.detail.pressAction?.id;
   if (event.type === EventType.PRESS) {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   User,
   createUserWithEmailAndPassword,
@@ -10,7 +10,9 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { getFirebaseAuth } from "../services/firebase";
-import { cacheIdToken, clearCachedIdToken } from "../services/incomingCallActions";
+import { AppState } from "react-native";
+import { cacheIdToken } from "../services/pushIdentity";
+import { startPushSession, stopPushSession, registerPushNotifications } from "../services/pushNotifications";
 
 type AuthContextValue = {
   user: User | null;
@@ -30,62 +32,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const auth = getFirebaseAuth();
   const managedAuthFlowRef = useRef(false);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
-      if (managedAuthFlowRef.current) return;
-      if (nextUser && !nextUser.emailVerified) {
-        await signOut(auth);
-        setUser(null);
-        setInitializing(false);
-        await clearCachedIdToken();
-        return;
+  const sessionUserRef = useRef<User | null>(null);
+  const sessionRevision = useRef(0);
+  const logoutPromiseRef = useRef<Promise<void> | null>(null);
+
+  const applyUser = useCallback(async (nextUser: User | null) => {
+    const revision = ++sessionRevision.current;
+    sessionUserRef.current = nextUser;
+    if (nextUser) {
+      try {
+        // Establish recipient filtering before rendering authenticated routes.
+        await startPushSession({
+          uid: nextUser.uid, email: nextUser.email,
+          getIdToken: () => nextUser.getIdToken(),
+        });
+      } catch {
+        console.warn("[push] unable to persist recipient; push remains disabled");
       }
+      if (revision !== sessionRevision.current) return;
       setUser(nextUser);
       setInitializing(false);
-      if (nextUser) {
-        try {
-          const token = await nextUser.getIdToken();
-          await cacheIdToken(token);
-        } catch {
-          // best-effort; the token will be refreshed on the next API call.
+      void registerPushNotifications();
+      try {
+        const token = await nextUser.getIdToken();
+        if (revision === sessionRevision.current) await cacheIdToken(token, nextUser.email ?? "");
+      } catch {
+        // Retry with the next authenticated request / foreground transition.
+      }
+    } else {
+      const cleanup = stopPushSession();
+      setUser(null);
+      setInitializing(false);
+      await cleanup;
+    }
+  }, []);
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (nextUser) => {
+      if (managedAuthFlowRef.current) return;
+      void (async () => {
+        if (nextUser && !nextUser.emailVerified) {
+          await applyUser(null);
+          await signOut(auth);
+          return;
         }
-      } else {
-        await clearCachedIdToken();
+        await applyUser(nextUser);
+      })().catch(() => console.warn("[auth] session transition failed"));
+    });
+  }, [auth, applyUser]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active" && sessionUserRef.current && !logoutPromiseRef.current) {
+        void registerPushNotifications();
       }
     });
-
-    return unsubscribe;
-  }, [auth]);
+    return () => subscription.remove();
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       initializing,
       async login(email, password) {
+        await logoutPromiseRef.current;
         managedAuthFlowRef.current = true;
         try {
           const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
           if (!credential.user.emailVerified) {
             await signOut(auth);
-            setUser(null);
+            await applyUser(null);
             throw new Error("Please verify your email before logging in.");
           }
-          setUser(credential.user);
-          const token = await credential.user.getIdToken();
-          await cacheIdToken(token);
+          await applyUser(credential.user);
         } finally {
           managedAuthFlowRef.current = false;
         }
       },
       async register(displayName, email, password) {
+        await logoutPromiseRef.current;
         managedAuthFlowRef.current = true;
         try {
           const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
           await updateProfile(credential.user, { displayName: displayName.trim() });
           await sendEmailVerification(credential.user);
           await signOut(auth);
-          setUser(null);
-          await clearCachedIdToken();
+          await applyUser(null);
         } finally {
           managedAuthFlowRef.current = false;
         }
@@ -93,20 +125,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async resetPassword(email) {
         await sendPasswordResetEmail(auth, email.trim());
       },
-      async logout() {
-        await signOut(auth);
+      logout() {
+        if (logoutPromiseRef.current) return logoutPromiseRef.current;
+        managedAuthFlowRef.current = true;
+        const work = (async () => {
+          try {
+            // Captured account credentials remain valid until unregister settles.
+            await applyUser(null);
+            await signOut(auth);
+          } finally {
+            managedAuthFlowRef.current = false;
+            logoutPromiseRef.current = null;
+          }
+        })();
+        logoutPromiseRef.current = work;
+        return work;
       },
       async getIdToken() {
-        const target = user ?? auth.currentUser;
+        const target = sessionUserRef.current;
         if (!target) {
           throw new Error("No authenticated user found.");
         }
         const token = await target.getIdToken();
-        await cacheIdToken(token);
+        if (sessionUserRef.current !== target || logoutPromiseRef.current) {
+          throw new Error("Authentication session changed.");
+        }
+        await cacheIdToken(token, target.email ?? "");
+        if (sessionUserRef.current !== target) throw new Error("Authentication session changed.");
         return token;
       },
     }),
-    [auth, initializing, user],
+    [auth, initializing, user, applyUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,48 +1,36 @@
+import { isCurrentPushRecipient } from "../services/pushIdentity";
 import { useEffect, useRef, useState } from "react";
 import { AppState, DeviceEventEmitter } from "react-native";
-import notifee, { EventType, type Event } from "@notifee/react-native";
-import messaging, { type FirebaseMessagingTypes } from "@react-native-firebase/messaging";
+import notifee, { type Event } from "@notifee/react-native";
+import messaging from "@react-native-firebase/messaging";
 import {
-  displayIncomingCall,
   handleIncomingCallEvent,
   setupIncomingCallCategory,
   cancelIncomingCall,
-  type IncomingCallData,
 } from "../services/incomingCallNotification";
 import {
   INCOMING_CALL_EVENT,
   clearPendingCallAction,
   readPendingCallAction,
-  sendRingingAck,
   type PendingCallAction,
 } from "../services/incomingCallActions";
+import { handleIncomingCallMessage } from "../services/incomingCallMessages";
 import type { CallState } from "./useWebRTCCall";
 
 type IncomingBridgeArgs = {
-  isAuthenticated: boolean;
+  userId: string | null;
   callState: CallState;
   acceptCall: () => Promise<void> | void;
   rejectCall: () => void;
   armAutoAccept: (callId: string | null) => void;
 };
 
-function parseRemotePayload(
-  data: FirebaseMessagingTypes.RemoteMessage["data"] | undefined,
-): IncomingCallData | null {
-  if (!data || data.type !== "incoming_call") return null;
-  const callId = typeof data.callId === "string" ? data.callId : "";
-  const fromUserId = typeof data.fromUserId === "string" ? data.fromUserId : "";
-  const fromDisplayName = typeof data.fromDisplayName === "string" ? data.fromDisplayName : "";
-  if (!callId || !fromUserId) return null;
-  return { callId, fromUserId, fromDisplayName: fromDisplayName || fromUserId };
-}
-
 /**
  * Wires foreground FCM data messages and Notifee action presses into the
  * existing WebRTC call hook.
  *
  * Foreground (`AppState === "active"`): we suppress the Notifee
- * heads-up because the in-app `CallOverlay` is already showing — a
+ * heads-up because the in-app `CallOverlay` is already showing â€” a
  * banner on top would be redundant.
  *
  * Backgrounded but JS still alive: `messaging().onMessage` fires here
@@ -56,16 +44,18 @@ function parseRemotePayload(
  * "Connecting..." instead of flashing through the in-app ringing UI.
  */
 export function useIncomingCallBridge({
-  isAuthenticated,
+  userId,
   callState,
   acceptCall,
   rejectCall,
   armAutoAccept,
 }: IncomingBridgeArgs): void {
+  const isAuthenticated = !!userId;
   // Tracked as state (not a ref) so that when AsyncStorage finishes
   // reading after the call has already reached "ringing" via the
   // WebSocket, the auto-accept effect re-runs.
   const [pendingAcceptCallId, setPendingAcceptCallId] = useState<string | null>(null);
+  const pendingRecipientRef = useRef<string | null>(null);
   const acceptRef = useRef(acceptCall);
   const rejectRef = useRef(rejectCall);
   const armRef = useRef(armAutoAccept);
@@ -85,66 +75,23 @@ export function useIncomingCallBridge({
   //     actions (caller hung up while our phone was still ringing).
   useEffect(() => {
     if (!isAuthenticated) return undefined;
+    let cancelled = false;
     const unsub = messaging().onMessage(async (remote) => {
-      const data = remote?.data;
-      const type = data && typeof data.type === "string" ? data.type : "";
-
-      if (type === "cancel_call") {
-        const callId = typeof data?.callId === "string" ? data.callId : "";
-        if (callId) {
-          try {
-            await cancelIncomingCall(callId);
-          } catch {
-            // ignore
-          }
-          try {
-            await clearPendingCallAction();
-          } catch {
-            // ignore
-          }
-          // If the WS already pushed us to ringing, drop the auto-accept
-          // bookkeeping so a stale Answer press can't sneak through.
-          setPendingAcceptCallId(null);
-          try {
-            armRef.current(null);
-          } catch {
-            // ignore
-          }
-        }
-        return;
-      }
-
-      const payload = parseRemotePayload(data);
-      if (!payload) return;
-      if (AppState.currentState === "active") {
-        try {
-          await cancelIncomingCall(payload.callId);
-        } catch {
-          // ignore
-        }
-        return;
-      }
-      try {
-        await displayIncomingCall(payload);
-      } catch (err) {
-        console.warn("[fcm-fg] failed to display incoming call", err);
-      }
-      // Tell backend the heads-up is on screen so the caller's UI
-      // flips out of "Reaching device..." into "Calling...".
-      try {
-        await sendRingingAck(payload.callId);
-      } catch {
-        // ignore
+      const outcome = await handleIncomingCallMessage(remote.data, AppState.currentState !== "active");
+      if (!cancelled && outcome?.cancelledCallId) {
+        setPendingAcceptCallId(current => current === outcome.cancelledCallId ? null : current);
+        armRef.current(null);
       }
     });
     return () => {
+      cancelled = true;
       try {
         unsub();
       } catch {
         // ignore
       }
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userId]);
 
   // Foreground notifee events: when the app is alive (foreground or
   // background but not killed), action presses come through this listener.
@@ -154,7 +101,7 @@ export function useIncomingCallBridge({
       void handleIncomingCallEvent(event);
     });
     return unsub;
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userId]);
 
   // React to pending actions emitted by the notifee listeners (foreground
   // or background) and to anything persisted from a cold start.
@@ -164,7 +111,7 @@ export function useIncomingCallBridge({
     let cancelled = false;
 
     const handle = async (action: PendingCallAction) => {
-      if (cancelled) return;
+      if (!(await isCurrentPushRecipient(action.payload.toUserId)) || cancelled) return;
       if (action.kind === "accept") {
         // Pre-arm useWebRTCCall so the next call_offer for this id
         // skips the ringing UI entirely. Also keep the state-based
@@ -176,8 +123,9 @@ export function useIncomingCallBridge({
         } catch {
           // ignore
         }
+        pendingRecipientRef.current = userId;
         setPendingAcceptCallId(action.payload.callId);
-        await clearPendingCallAction();
+        await clearPendingCallAction(action.payload.callId);
       } else if (action.kind === "decline") {
         // The decline HTTP call is fired in incomingCallActions; here we
         // also trigger the in-app reject path in case the WS happens to
@@ -187,7 +135,7 @@ export function useIncomingCallBridge({
         } catch {
           // ignore
         }
-        await clearPendingCallAction();
+        await clearPendingCallAction(action.payload.callId);
       }
     };
 
@@ -206,20 +154,20 @@ export function useIncomingCallBridge({
       cancelled = true;
       sub.remove();
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userId]);
 
   // Reconcile the pending Accept against the actual call state.
   //
   // - Fast path: `armAutoAccept` was set in time and useWebRTCCall sent
   //   the call directly to "connecting"; we just clear the bookkeeping.
   // - Fallback path: arming missed the offer (e.g. AsyncStorage finished
-  //   AFTER call_offer arrived), so the call is now "ringing" → fire
+  //   AFTER call_offer arrived), so the call is now "ringing" â†’ fire
   //   `acceptCall()` to advance it.
   //
   // Re-runs on either pending state OR call state change, so it works
   // regardless of which finished resolving first on cold start.
   useEffect(() => {
-    if (!pendingAcceptCallId) return;
+    if (!isAuthenticated || pendingRecipientRef.current !== userId || !pendingAcceptCallId) return;
     if (callState.callId !== pendingAcceptCallId) return;
 
     if (callState.status === "ringing") {
@@ -241,7 +189,7 @@ export function useIncomingCallBridge({
       // Already connecting/connected via the armed fast path.
       setPendingAcceptCallId(null);
     }
-  }, [callState.callId, callState.status, pendingAcceptCallId]);
+  }, [callState.callId, callState.status, pendingAcceptCallId, isAuthenticated, userId]);
 
   // Whenever the in-app call ends, dismiss any leftover notification.
   useEffect(() => {
@@ -250,27 +198,11 @@ export function useIncomingCallBridge({
     }
   }, [callState.callId, callState.status]);
 
-  // Clear any pending call action ONLY on a real sign-out transition
-  // (was authenticated → no longer authenticated).
-  //
-  // On cold start the app boots with `isAuthenticated === false` until
-  // Firebase restores the persisted user; running cleanup at that point
-  // would wipe the pending Accept the headless JS handler just wrote
-  // when the user tapped "Answer", and the auto-accept flow would
-  // silently break — exactly the cold-start re-tap symptom we hit.
-  const hasEverAuthenticatedRef = useRef(false);
+  // Reset in-memory intent on every account transition, including A -> B.
+  // Persisted cold-start intent is validated by readPendingCallAction above.
   useEffect(() => {
-    if (isAuthenticated) {
-      hasEverAuthenticatedRef.current = true;
-      return;
-    }
-    if (!hasEverAuthenticatedRef.current) return;
+    pendingRecipientRef.current = null;
     setPendingAcceptCallId(null);
-    try {
-      armRef.current(null);
-    } catch {
-      // ignore
-    }
-    void clearPendingCallAction();
-  }, [isAuthenticated]);
+    armRef.current(null);
+  }, [userId]);
 }

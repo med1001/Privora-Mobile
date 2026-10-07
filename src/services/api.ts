@@ -72,17 +72,19 @@ export function fetchRtcConfig(token: string) {
   });
 }
 
-export function registerPushToken(token: string, deviceToken: string, platform: "android" | "ios" | "web") {
+export function registerPushToken(token: string, deviceToken: string, platform: "android" | "ios" | "web", signal?: AbortSignal) {
   return apiFetch<{ ok: boolean }>("/api/push/register", token, {
     method: "POST",
     body: JSON.stringify({ token: deviceToken, platform }),
+    signal,
   });
 }
 
-export function unregisterPushToken(token: string, deviceToken: string) {
+export function unregisterPushToken(token: string, deviceToken: string, signal?: AbortSignal) {
   return apiFetch<{ ok: boolean }>("/api/push/unregister", token, {
     method: "POST",
     body: JSON.stringify({ token: deviceToken }),
+    signal,
   });
 }
 

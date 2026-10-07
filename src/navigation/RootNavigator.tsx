@@ -10,10 +10,6 @@ import { useWebRTCCall } from "../hooks/useWebRTCCall";
 import { useIncomingCallBridge } from "../hooks/useIncomingCallBridge";
 import { CallOverlay } from "../components/CallOverlay";
 import type { WsIncomingMessage } from "../types/chat";
-import {
-  registerPushNotifications,
-  unregisterPushNotifications,
-} from "../services/pushNotifications";
 
 export type RootStackParamList = {
   Login: undefined;
@@ -57,42 +53,12 @@ export function RootNavigator() {
   // notification, this auto-runs `acceptCall` once the queued
   // `call_offer` arrives over the WebSocket.
   useIncomingCallBridge({
-    isAuthenticated: user != null,
+    userId: user?.email ?? null,
     callState: webrtc.callState,
     acceptCall: webrtc.acceptCall,
     rejectCall: webrtc.rejectCall,
     armAutoAccept: webrtc.armAutoAccept,
   });
-
-  // Register the device for incoming-call push notifications once we know
-  // who is logged in. The call is idempotent and silently no-ops on
-  // emulators / Expo Go where FCM tokens are unavailable.
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    void (async () => {
-      const ok = await registerPushNotifications(getIdToken);
-      if (cancelled) return;
-      if (!ok) {
-        console.info("[push] notifications not enabled (no permission or no FCM token)");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [getIdToken, user]);
-
-  // On logout, drop the token so the previous user no longer rings on this
-  // device. We capture `getIdToken` at unmount time via ref to avoid
-  // triggering this effect on every render.
-  const logoutCleanupRef = useRef(getIdToken);
-  logoutCleanupRef.current = getIdToken;
-  useEffect(() => {
-    if (user) return undefined;
-    return () => {
-      void unregisterPushNotifications(logoutCleanupRef.current);
-    };
-  }, [user]);
 
   if (initializing) {
     return (
