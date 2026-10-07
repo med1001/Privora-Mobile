@@ -21,7 +21,7 @@ type AuthContextValue = {
   register: (displayName: string, email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  getIdToken: () => Promise<string>;
+  getIdToken: (forceRefresh?: boolean) => Promise<string>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -141,17 +141,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logoutPromiseRef.current = work;
         return work;
       },
-      async getIdToken() {
+      async getIdToken(forceRefresh = false) {
         const target = sessionUserRef.current;
-        if (!target) {
-          throw new Error("No authenticated user found.");
+        if (!target || target.uid !== user?.uid) {
+          throw Object.assign(new Error("No authenticated user found."), { code: "auth/session-changed" });
         }
-        const token = await target.getIdToken();
+        const token = await target.getIdToken(forceRefresh);
         if (sessionUserRef.current !== target || logoutPromiseRef.current) {
-          throw new Error("Authentication session changed.");
+          throw Object.assign(new Error("Authentication session changed."), { code: "auth/session-changed" });
         }
         await cacheIdToken(token, target.email ?? "");
-        if (sessionUserRef.current !== target) throw new Error("Authentication session changed.");
+        if (sessionUserRef.current !== target) throw Object.assign(new Error("Authentication session changed."), { code: "auth/session-changed" });
         return token;
       },
     }),

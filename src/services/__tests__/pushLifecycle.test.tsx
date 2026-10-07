@@ -368,3 +368,10 @@ test('the bridge drops A pending auto-accept on a direct account transition to B
   expect(armAutoAccept).toHaveBeenLastCalledWith(null);
   expect(acceptCall).not.toHaveBeenCalled();
 });
+
+
+test('AuthProvider forwards a forced WebSocket token refresh to Firebase', async () => {
+  const { result, user } = await mountAuthenticated();
+  await result.current.getIdToken(true);
+  expect(user.getIdToken).toHaveBeenLastCalledWith(true);
+});

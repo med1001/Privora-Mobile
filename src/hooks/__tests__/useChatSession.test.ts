@@ -75,7 +75,7 @@ beforeEach(() => {
 
 async function mountSession() {
   const hook = renderHook(() => useChatSession());
-  await waitFor(() => expect(sockets[0].connect).toHaveBeenCalledWith('test-token'));
+  await waitFor(() => expect(sockets[0].connect).toHaveBeenCalledWith(auth.getIdToken));
   return hook;
 }
 
@@ -149,7 +149,7 @@ test('logout clears state and a subsequent account cannot receive events from th
 
   auth = { ...auth, user: bob };
   rerender({});
-  await waitFor(() => expect(sockets[1].connect).toHaveBeenCalledWith('test-token'));
+  await waitFor(() => expect(sockets[1].connect).toHaveBeenCalledWith(auth.getIdToken));
   act(() => {
     oldSocket.emit({ ...incoming, msg_id: 'late-old-message' });
     oldSocket.options?.onOpen?.();
@@ -161,4 +161,16 @@ test('logout clears state and a subsequent account cannot receive events from th
   expect(result.current.contacts.map(({ userId }) => userId)).toEqual(['bob@example.test']);
   act(() => sockets[1].emit({ ...incoming, to: 'bob@example.test', msg_id: 'bob-message' }));
   expect(result.current.selectedMessages.map(({ id }) => id)).toEqual(['bob-message']);
+});
+
+
+test('only the current WebSocket can trigger logout on authentication failure', async () => {
+  const { rerender } = await mountSession();
+  const old = sockets[0];
+  auth = { ...auth, user: bob };
+  rerender({});
+  act(() => { old.options?.onAuthError?.(); old.options?.onError?.('stale failure'); });
+  expect(auth.logout).not.toHaveBeenCalled();
+  act(() => sockets[1].options?.onAuthError?.());
+  expect(auth.logout).toHaveBeenCalledTimes(1);
 });
