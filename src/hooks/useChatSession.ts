@@ -161,11 +161,11 @@ export function useChatSession(options?: UseChatSessionOptions) {
     let active = true;
     const ws = new WsClient({
       onAuthError: () => {
-        void logout();
+        if (active) void logout();
       },
-      onError: (message) => setLastError(message),
+      onError: (message) => { if (active) setLastError(message); },
       onOpen: () => {
-        if (active) setWsReady(true);
+        if (active) { setWsReady(true); setLastError(null); }
       },
       onClose: () => {
         if (active) setWsReady(false);
@@ -386,13 +386,7 @@ export function useChatSession(options?: UseChatSessionOptions) {
       }
     });
 
-    getIdToken()
-      .then((token) => {
-        if (!active) return;
-        ws.connect(token);
-        setLastError(null);
-      })
-      .catch((err) => setLastError(String(err)));
+    ws.connect(getIdToken);
 
     return () => {
       active = false;
